@@ -1,20 +1,20 @@
 #include <iostream>
 #include <string>
 #include <limits>
-#include "models.h"
-#include "authModule.h"
-#include "concertModule.h"
-#include "ticketModule.h"
-#include "venueModule.h"
-#include "crewModule.h"
-#include "paymentModule.h"
-#include "commModule.h"
-#include "feedbackModule.h"
-#include "performerModule.h"
-#include "reportModule.h"
-#include "sponsorModule.h"
-#include "attendeeModule.h"
-#include "uiModule.h"
+#include "include/models.h"
+#include "include/authModule.h"
+#include "include/concertModule.h"
+#include "include/ticketModule.h"
+#include "include/venueModule.h"
+#include "include/crewModule.h"
+#include "include/paymentModule.h"
+#include "include/commModule.h"
+#include "include/feedbackModule.h"
+#include "include/performerModule.h"
+#include "include/reportModule.h"
+#include "include/sponsorModule.h"
+#include "include/attendeeModule.h"
+#include "include/uiModule.h"
 
 // Forward declarations for portal handlers
 void runManagementPortal();
@@ -134,6 +134,7 @@ void runUserPortal() {
                 logout = true;
                 break;
             default:
+                break; // Handle invalid choice
                 //UIManager::showError("Invalid choice");
         }
     }
