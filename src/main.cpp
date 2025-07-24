@@ -22,12 +22,8 @@ void runUserPortal();
 void displayMainMenu();
 
 void displayMainMenu() {
-    //UIManager::displayBanner("CONCERT MANAGEMENT SYSTEM");
-    // print using ui manager 
-    // "1. Management Portal (Staff Access)\n"
-    // "2. User Portal (Ticket Purchase & Feedback)\n"
-    // "3. Exit Program\n"
-    // "=============================================\n";
+    // Display the main menu banner using UIManager strings
+    std::cout << UIManager::MAIN_MENU;
 }
 
 void runManagementPortal() {
