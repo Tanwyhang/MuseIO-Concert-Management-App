@@ -1,4 +1,6 @@
-#pragma once
+#ifndef ATTENDEEMODULE_H
+#define ATTENDEEMODULE_H
+
 #include <string>
 #include <vector>
 #include <optional>
@@ -100,3 +102,5 @@ namespace Attendee {
     }
 
 }
+
+#endif 
