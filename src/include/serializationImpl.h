@@ -1,12 +1,11 @@
-#ifndef SERIALIZATION_IMPL_H
-#define SERIALIZATION_IMPL_H
+#pragma once
 
 #include "serializationUtils.h"
 #include "models.h"
 
-namespace MuseIO {
+// Using the Model namespace
+using namespace Model;
 
-// Implementation of DateTimeSerializer
 void DateTimeSerializer::serialize(std::ofstream& out, const DateTime& dt) {
     StringSerializer::serialize(out, dt.toString());
 }
@@ -14,7 +13,3 @@ void DateTimeSerializer::serialize(std::ofstream& out, const DateTime& dt) {
 void DateTimeSerializer::deserialize(std::ifstream& in, DateTime& dt) {
     dt = DateTime(StringSerializer::deserialize(in));
 }
-
-} // namespace MuseIO
-
-#endif // SERIALIZATION_IMPL_H

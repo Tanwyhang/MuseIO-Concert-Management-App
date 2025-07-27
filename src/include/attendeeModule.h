@@ -5,7 +5,7 @@
 #include <vector>
 #include <optional>
 
-namespace Attendee {
+namespace AttendeeManager {
 
     struct AttendeeInfo {
         int id;

@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-namespace crew {
+namespace CrewManager {
 
 // Forward declaration of Task and TaskArray
 struct Task;

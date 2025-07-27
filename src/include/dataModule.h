@@ -11,18 +11,16 @@
 #include "models.h"
 #include "serializationUtils.h"
 
-namespace MuseIO {
-
 // Class for handling data persistence operations
 class DataManager {
 private:
     SerializationManager serializer;
     
     // Object caches
-    std::vector<std::shared_ptr<Concert>> concerts;
-    std::vector<std::shared_ptr<Venue>> venues;
-    std::vector<std::shared_ptr<Performer>> performers;
-    std::vector<std::shared_ptr<Attendee>> attendees;
+    std::vector<std::shared_ptr<Model::Concert>> concerts;
+    std::vector<std::shared_ptr<Model::Venue>> venues;
+    std::vector<std::shared_ptr<Model::Performer>> performers;
+    std::vector<std::shared_ptr<Model::Attendee>> attendees;
     // Add more collections as needed
     
     // File names for different object types
@@ -90,7 +88,7 @@ public:
         return saveData(concerts, CONCERTS_FILE);
     }
     
-    std::shared_ptr<Concert> getConcert(int id) {
+    std::shared_ptr<Model::Concert> getConcert(int id) {
         for (auto& concert : concerts) {
             if (concert->getId() == id) {
                 return concert;
@@ -99,11 +97,11 @@ public:
         return nullptr;
     }
     
-    void addConcert(std::shared_ptr<Concert> concert) {
+    void addConcert(std::shared_ptr<Model::Concert> concert) {
         concerts.push_back(concert);
     }
     
-    const std::vector<std::shared_ptr<Concert>>& getAllConcerts() {
+    const std::vector<std::shared_ptr<Model::Concert>>& getAllConcerts() {
         return concerts;
     }
     
@@ -116,7 +114,7 @@ public:
         return saveData(venues, VENUES_FILE);
     }
     
-    std::shared_ptr<Venue> getVenue(int id) {
+    std::shared_ptr<Model::Venue> getVenue(int id) {
         for (auto& venue : venues) {
             if (venue->getId() == id) {
                 return venue;
@@ -125,11 +123,11 @@ public:
         return nullptr;
     }
     
-    void addVenue(std::shared_ptr<Venue> venue) {
+    void addVenue(std::shared_ptr<Model::Venue> venue) {
         venues.push_back(venue);
     }
     
-    const std::vector<std::shared_ptr<Venue>>& getAllVenues() {
+    const std::vector<std::shared_ptr<Model::Venue>>& getAllVenues() {
         return venues;
     }
     
@@ -141,8 +139,8 @@ public:
     bool savePerformers() {
         return saveData(performers, PERFORMERS_FILE);
     }
-    
-    std::shared_ptr<Performer> getPerformer(int id) {
+
+    std::shared_ptr<Model::Performer> getPerformer(int id) {
         for (auto& performer : performers) {
             if (performer->getId() == id) {
                 return performer;
@@ -151,11 +149,11 @@ public:
         return nullptr;
     }
     
-    void addPerformer(std::shared_ptr<Performer> performer) {
+    void addPerformer(std::shared_ptr<Model::Performer> performer) {
         performers.push_back(performer);
     }
     
-    const std::vector<std::shared_ptr<Performer>>& getAllPerformers() {
+    const std::vector<std::shared_ptr<Model::Performer>>& getAllPerformers() {
         return performers;
     }
     
@@ -168,7 +166,7 @@ public:
         return saveData(attendees, ATTENDEES_FILE);
     }
     
-    std::shared_ptr<Attendee> getAttendee(int id) {
+    std::shared_ptr<Model::Attendee> getAttendee(int id) {
         for (auto& attendee : attendees) {
             if (attendee->getId() == id) {
                 return attendee;
@@ -177,11 +175,11 @@ public:
         return nullptr;
     }
     
-    void addAttendee(std::shared_ptr<Attendee> attendee) {
+    void addAttendee(std::shared_ptr<Model::Attendee> attendee) {
         attendees.push_back(attendee);
     }
     
-    const std::vector<std::shared_ptr<Attendee>>& getAllAttendees() {
+    const std::vector<std::shared_ptr<Model::Attendee>>& getAllAttendees() {
         return attendees;
     }
     
@@ -203,7 +201,5 @@ public:
         }
     }
 };
-
-} // namespace MuseIO
 
 #endif // DATA_MANAGER_H

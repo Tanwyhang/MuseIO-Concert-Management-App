@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-namespace feedback {
+namespace FeedbackManager {
 
 struct Feedback {
     int rating;

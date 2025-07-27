@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-namespace payment {
+namespace PaymentManager {
 
     // Enum for payment status
     enum class PaymentStatus {
@@ -30,4 +30,4 @@ namespace payment {
     // Get all payments for reporting or management
     std::vector<Payment> getAllPayments();
 
-} // namespace payment
+}

@@ -9,10 +9,12 @@
 #include <filesystem>
 #include <type_traits>
 
-namespace MuseIO {
-
 // Forward declarations
-class DateTime;
+namespace Model {
+    struct DateTime;
+}
+// Use Model namespace for DateTime
+using Model::DateTime;
 
 // Helper class for string serialization
 class StringSerializer {
@@ -295,7 +297,5 @@ public: \
 #define DESERIALIZABLE_CLASS_END \
         return in.good(); \
     }
-
-} // namespace MuseIO
 
 #endif // SERIALIZATION_UTILS_H
