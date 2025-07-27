@@ -7,8 +7,14 @@
 #include <chrono>
 #include <ctime>
 #include <optional>
+#include <fstream>
+#include "serializationUtils.h"
+#include <dataManager.h>
 
 namespace MuseIO {
+
+// Forward declarations from models.h
+struct DateTime;
 
 // Forward declarations
 class Concert;
@@ -50,6 +56,12 @@ struct DateTime {
     
     // Return the formatted string
     std::string toString() const { return iso8601String; }
+    
+    SERIALIZABLE_CLASS_BEGIN(DateTime)
+        SERIALIZABLE_FIELD_STRING(iso8601String)
+    SERIALIZABLE_CLASS_END
+        DESERIALIZABLE_FIELD_STRING(iso8601String)
+    DESERIALIZABLE_CLASS_END
 };
 
 // Enum for event status
@@ -741,6 +753,31 @@ public:
         report->setConcert(shared_from_this());
     }
     const std::vector<std::shared_ptr<ConcertReport>>& getReports() const { return reports; }
+    
+    // Serialization methods using the templated utilities
+    SERIALIZABLE_CLASS_BEGIN(Concert)
+        SERIALIZABLE_FIELD_INT(id)
+        SERIALIZABLE_FIELD_STRING(name)
+        SERIALIZABLE_FIELD_STRING(description)
+        SERIALIZABLE_FIELD_DATETIME(start_date_time)
+        SERIALIZABLE_FIELD_DATETIME(end_date_time)
+        SERIALIZABLE_FIELD_ENUM(event_status)
+        SERIALIZABLE_FIELD_DATETIME(created_at)
+        SERIALIZABLE_FIELD_DATETIME(updated_at)
+        // Note: Complex object relationships require special handling
+    SERIALIZABLE_CLASS_END
+        // serialize/deserialize relationships
+
+        DESERIALIZABLE_FIELD_INT(id)
+        DESERIALIZABLE_FIELD_STRING(name)
+        DESERIALIZABLE_FIELD_STRING(description)
+        DESERIALIZABLE_FIELD_DATETIME(start_date_time)
+        DESERIALIZABLE_FIELD_DATETIME(end_date_time)
+        DESERIALIZABLE_FIELD_ENUM(event_status)
+        DESERIALIZABLE_FIELD_DATETIME(created_at)
+        DESERIALIZABLE_FIELD_DATETIME(updated_at)
+        // Note: Complex object relationships require special handling
+    DESERIALIZABLE_CLASS_END
 };
 
 // Implementation of methods that require the full class definitions
