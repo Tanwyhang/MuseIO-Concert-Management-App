@@ -19,7 +19,6 @@
  * and attendee-specific search capabilities.
  */
 class AttendeeModule : public BaseModule<Model::Attendee> {
-
 public:
     /**
      * @brief Constructor
