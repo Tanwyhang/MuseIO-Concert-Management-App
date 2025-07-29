@@ -1,20 +1,20 @@
 #include <iostream>
 #include <string>
 #include <limits>
-#include "include/models.h"
-#include "include/authModule.h"
-#include "include/concertModule.h"
-#include "include/ticketModule.h"
-#include "include/venueModule.h"
-#include "include/crewModule.h"
-#include "include/paymentModule.h"
-#include "include/commModule.h"
-#include "include/feedbackModule.h"
-#include "include/performerModule.h"
-#include "include/reportModule.h"
-#include "include/sponsorModule.h"
-#include "include/attendeeModule.h"
-#include "include/uiModule.h"
+#include "include/models.hpp"
+#include "include/authModule.hpp"
+#include "include/concertModule.hpp"
+#include "include/ticketModule.hpp"
+#include "include/venueModule.hpp"
+#include "include/crewModule.hpp"
+#include "include/paymentModule.hpp"
+#include "include/commModule.hpp"
+#include "include/feedbackModule.hpp"
+#include "include/performerModule.hpp"
+#include "include/reportModule.hpp"
+#include "include/sponsorModule.hpp"
+#include "include/attendeeModule.hpp"
+#include "include/uiModule.hpp"
 
 // Forward declarations for portal handlers
 void runManagementPortal();
