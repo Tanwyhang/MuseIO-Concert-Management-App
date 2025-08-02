@@ -23,10 +23,7 @@ std::string getAttendeeTypeString(Model::AttendeeType type) {
     switch (type) {
         case Model::AttendeeType::REGULAR:    return "REGULAR";
         case Model::AttendeeType::VIP:        return "VIP";
-        case Model::AttendeeType::STAFF:      return "STAFF";
-        case Model::AttendeeType::PRESS:      return "PRESS";
-        case Model::AttendeeType::PERFORMER:  return "PERFORMER";
-        default:                             return "UNKNOWN";
+        default:                              return "UNKNOWN";
     }
 }
 
@@ -113,13 +110,13 @@ std::vector<std::shared_ptr<Model::Attendee>> testCreateOperation(AttendeeModule
     displayAttendee(attendee2);
     displaySeparator();
     
-    // Create staff attendee
-    std::cout << "Creating staff attendee..." << std::endl;
+    // Create staff-privileged attendee (regular type with staff privileges)
+    std::cout << "Creating staff-privileged attendee..." << std::endl;
     auto attendee3 = module.createAttendee(
         "Robert Johnson",
         "robert.johnson@example.com",
         "555-555-5555",
-        Model::AttendeeType::STAFF,
+        Model::AttendeeType::REGULAR,
         "robertj",
         "staffpass",
         true
@@ -128,13 +125,13 @@ std::vector<std::shared_ptr<Model::Attendee>> testCreateOperation(AttendeeModule
     displayAttendee(attendee3);
     displaySeparator();
     
-    // Create press attendee
-    std::cout << "Creating press attendee..." << std::endl;
+    // Create VIP press attendee
+    std::cout << "Creating VIP press attendee..." << std::endl;
     auto attendee4 = module.createAttendee(
         "Maria Garcia",
         "maria.garcia@press.com",
         "555-222-3333",
-        Model::AttendeeType::PRESS,
+        Model::AttendeeType::VIP,
         "mariag",
         "presspass"
     );

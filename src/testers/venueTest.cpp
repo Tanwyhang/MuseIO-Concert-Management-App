@@ -22,7 +22,6 @@ void displayHeader(const std::string& title) {
 std::string getSeatStatusString(Model::TicketStatus status) {
     switch (status) {
         case Model::TicketStatus::AVAILABLE:   return "AVAILABLE";
-        case Model::TicketStatus::RESERVED:    return "RESERVED";
         case Model::TicketStatus::SOLD:        return "SOLD";
         case Model::TicketStatus::CHECKED_IN:  return "CHECKED_IN";
         case Model::TicketStatus::CANCELLED:   return "CANCELLED";
@@ -356,7 +355,7 @@ void testUpdateOperations(VenueModule& module, const std::vector<std::shared_ptr
         std::cout << "Before update:" << std::endl;
         displaySeatList({seats[0]});
         
-        if (module.updateSeatStatus(venueId, seatId, Model::TicketStatus::RESERVED)) {
+        if (module.updateSeatStatus(venueId, seatId, Model::TicketStatus::SOLD)) {
             std::cout << "\nAfter update:" << std::endl;
             auto updatedSeats = module.getSeatsForVenue(venueId);
             

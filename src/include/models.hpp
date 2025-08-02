@@ -71,7 +71,6 @@ namespace Model {
     // Enum for ticket status
     enum class TicketStatus {
         AVAILABLE,
-        RESERVED,
         SOLD,
         CHECKED_IN,
         CANCELLED,
@@ -82,8 +81,7 @@ namespace Model {
     enum class TaskStatus {
         TODO,
         IN_PROGRESS,
-        COMPLETED,
-        BLOCKED
+        COMPLETED
     };
 
     // Enum for task priority
@@ -98,9 +96,6 @@ namespace Model {
     enum class AttendeeType {
         REGULAR,
         VIP,
-        STAFF,
-        PRESS,
-        PERFORMER
     };
 
     // Enum for discount type
@@ -132,7 +127,72 @@ namespace Model {
         std::string description;
         std::string contact_info;
         std::string seatmap;           // URL or reference to seatmap file
+        
+        // Linear collection of all seats
         std::vector<std::shared_ptr<Seat>> seats;
+        
+        // 2D array representation of seating plan
+        std::vector<std::vector<std::shared_ptr<Seat>>> seatingPlan;
+        
+        // Dimensions of the seating plan
+        int rows;
+        int columns;
+        
+        // Method to initialize 2D seating plan
+        void initializeSeatingPlan(int numRows, int numCols) {
+            rows = numRows;
+            columns = numCols;
+            seatingPlan.resize(rows);
+            for (int i = 0; i < rows; i++) {
+                seatingPlan[i].resize(columns, nullptr);
+            }
+        }
+        
+        // Method to map a seat to the 2D seating plan
+        void mapSeatToSeatingPlan(const std::shared_ptr<Seat>& seat) {
+            if (!seat || seat->row_number.empty() || seat->col_number.empty()) {
+                return;
+            }
+            
+            // Convert seat row/col to array indices
+            // Assuming row_number could be like "A", "B", etc. or "1", "2", etc.
+            int rowIdx;
+            if (seat->row_number[0] >= 'A' && seat->row_number[0] <= 'Z') {
+                rowIdx = seat->row_number[0] - 'A';
+            } else {
+                try {
+                    rowIdx = std::stoi(seat->row_number) - 1;
+                } catch (...) {
+                    return; // Invalid format
+                }
+            }
+            
+            int colIdx;
+            try {
+                colIdx = std::stoi(seat->col_number) - 1;
+            } catch (...) {
+                return; // Invalid format
+            }
+            
+            // Check bounds
+            if (rowIdx >= 0 && rowIdx < rows && colIdx >= 0 && colIdx < columns) {
+                seatingPlan[rowIdx][colIdx] = seat;
+            }
+        }
+        
+        // Method to add a seat and update the seating plan
+        void addSeat(const std::shared_ptr<Seat>& seat) {
+            seats.push_back(seat);
+            mapSeatToSeatingPlan(seat);
+        }
+        
+        // Get seat at specific row/column in the seating plan
+        std::shared_ptr<Seat> getSeatAt(int row, int col) const {
+            if (row >= 0 && row < rows && col >= 0 && col < columns) {
+                return seatingPlan[row][col];
+            }
+            return nullptr;
+        }
     };
 
     // Task struct for crew assignments
