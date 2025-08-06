@@ -1,375 +1,472 @@
 #include <iostream>
-#include <cassert>
-#include <vector>
 #include <memory>
-#include "../include/paymentModule.hpp"
+#include <string>
+#include <iomanip>
+#include <vector>
 #include "../include/models.hpp"
+#include "../include/paymentModule.hpp"
 
-/**
- * @brief Test suite for PaymentModule
- * 
- * This file contains comprehensive tests for all PaymentModule functionality
- * including payment processing, refunds, analytics, and data persistence.
- */
+// Utility function to display a separator line
+void displaySeparator(char symbol = '-', int length = 50) {
+    std::cout << std::string(length, symbol) << std::endl;
+}
 
-class PaymentModuleTest {
-private:
-    PaymentManager::PaymentModule paymentModule;
+// Utility function to display a section header
+void displayHeader(const std::string& title) {
+    displaySeparator('=');
+    std::cout << title << std::endl;
+    displaySeparator('=');
+}
+
+// Utility function for displaying payment status
+std::string getPaymentStatusString(Model::PaymentStatus status) {
+    switch (status) {
+        case Model::PaymentStatus::PENDING:   return "PENDING";
+        case Model::PaymentStatus::COMPLETED: return "COMPLETED";
+        case Model::PaymentStatus::FAILED:    return "FAILED";
+        case Model::PaymentStatus::REFUNDED:  return "REFUNDED";
+        default:                              return "UNKNOWN";
+    }
+}
+
+// Detailed display of a single payment
+void displayPayment(const std::shared_ptr<Model::Payment>& payment, bool detailed = true) {
+    if (!payment) {
+        std::cout << "[NULL PAYMENT REFERENCE]" << std::endl;
+        return;
+    }
     
-public:
-    PaymentModuleTest() : paymentModule("test_data/test_payments.dat") {}
-
-    /**
-     * @brief Run all payment module tests
-     */
-    void runAllTests() {
-        std::cout << "=== Starting PaymentModule Tests ===" << std::endl;
+    std::cout << "Payment ID: " << payment->payment_id << std::endl;
+    std::cout << "Amount: " << std::fixed << std::setprecision(2) << payment->amount 
+              << " " << payment->currency << std::endl;
+    
+    if (detailed) {
+        std::cout << "Payment Method: " << payment->payment_method << std::endl;
+        std::cout << "Transaction ID: " << payment->transaction_id << std::endl;
+        std::cout << "Status: " << getPaymentStatusString(payment->status) << std::endl;
+        std::cout << "Date/Time: " << payment->payment_date_time.iso8601String << std::endl;
         
-        try {
-            testPaymentCreation();
-            testPaymentProcessing();
-            testPaymentStatusUpdates();
-            testRefundProcessing();
-            testPaymentQueries();
-            testPaymentAnalytics();
-            testTransactionManagement();
-            testPaymentValidation();
-            testRecentPayments();
-            testDateRangeQueries();
-            testRevenueCalculation();
-            testPaymentStatistics();
-            testPaymentReports();
-            
-            std::cout << "✅ All PaymentModule tests passed!" << std::endl;
-        } catch (const std::exception& e) {
-            std::cout << "❌ Test failed: " << e.what() << std::endl;
+        auto attendee = payment->attendee.lock();
+        if (attendee) {
+            std::cout << "Attendee: " << attendee->name << " (ID: " << attendee->getId() << ")" << std::endl;
+        } else {
+            std::cout << "Attendee: [Not linked]" << std::endl;
         }
-        
-        std::cout << "=== PaymentModule Tests Complete ===" << std::endl;
     }
+}
 
-private:
-    /**
-     * @brief Test payment creation functionality
-     */
-    void testPaymentCreation() {
-        std::cout << "Testing payment creation..." << std::endl;
-        
-        // Create test payment
-        Model::Payment payment;
-        payment.payment_id = 1;
-        payment.amount = 99.99;
-        payment.currency = "USD";
-        payment.payment_method = "Credit Card";
-        payment.transaction_id = "txn_test_001";
-        payment.status = Model::PaymentStatus::PENDING;
-        payment.payment_date_time = Model::DateTime::now();
-        
-        // Test payment creation
-        int payment_id = paymentModule.createPayment(payment);
-        assert(payment_id > 0);
-        
-        // Verify payment exists
-        auto retrieved_payment = paymentModule.getPaymentById(payment_id);
-        assert(retrieved_payment != nullptr);
-        assert(retrieved_payment->amount == 99.99);
-        assert(retrieved_payment->currency == "USD");
-        
-        std::cout << "✅ Payment creation test passed" << std::endl;
+// Display a collection of payments
+void displayPaymentList(const std::vector<std::shared_ptr<Model::Payment>>& payments) {
+    if (payments.empty()) {
+        std::cout << "No payments found." << std::endl;
+        return;
     }
-
-    /**
-     * @brief Test payment processing workflow
-     */
-    void testPaymentProcessing() {
-        std::cout << "Testing payment processing..." << std::endl;
-        
-        // Test payment processing
-        std::string transaction_id = paymentModule.processPayment(
-            123, // attendee_id
-            149.99, // amount
-            "USD", // currency
-            "PayPal" // payment_method
-        );
-        
-        assert(!transaction_id.empty());
-        
-        // Verify transaction exists and is valid
-        bool is_valid = paymentModule.validateTransaction(transaction_id);
-        assert(is_valid);
-        
-        std::cout << "✅ Payment processing test passed" << std::endl;
+    
+    std::cout << "Found " << payments.size() << " payment(s):" << std::endl;
+    displaySeparator();
+    
+    // Table header
+    std::cout << std::setw(8) << "ID"
+              << std::setw(12) << "Amount"
+              << std::setw(8) << "Currency"
+              << std::setw(15) << "Method"
+              << std::setw(12) << "Status"
+              << std::setw(20) << "Transaction ID" << std::endl;
+    displaySeparator();
+    
+    // Table rows
+    for (const auto& payment : payments) {
+        std::cout << std::setw(8) << payment->payment_id
+                  << std::setw(12) << std::fixed << std::setprecision(2) << payment->amount
+                  << std::setw(8) << payment->currency
+                  << std::setw(15) << payment->payment_method
+                  << std::setw(12) << getPaymentStatusString(payment->status)
+                  << std::setw(20) << payment->transaction_id << std::endl;
     }
+    displaySeparator();
+}
 
-    /**
-     * @brief Test payment status updates
-     */
-    void testPaymentStatusUpdates() {
-        std::cout << "Testing payment status updates..." << std::endl;
-        
-        // Create a test payment first
-        Model::Payment payment;
-        payment.payment_id = 2;
-        payment.amount = 75.50;
-        payment.currency = "USD";
-        payment.payment_method = "Credit Card";
-        payment.transaction_id = "txn_test_002";
-        payment.status = Model::PaymentStatus::PENDING;
-        payment.payment_date_time = Model::DateTime::now();
-        
-        int payment_id = paymentModule.createPayment(payment);
-        assert(payment_id > 0);
-        
-        // Test status update to COMPLETED
-        bool updated = paymentModule.updatePaymentStatus(payment_id, Model::PaymentStatus::COMPLETED);
-        assert(updated);
-        
-        // Verify status was updated
-        auto updated_payment = paymentModule.getPaymentById(payment_id);
-        assert(updated_payment->status == Model::PaymentStatus::COMPLETED);
-        
-        std::cout << "✅ Payment status update test passed" << std::endl;
-    }
-
-    /**
-     * @brief Test refund processing
-     */
-    void testRefundProcessing() {
-        std::cout << "Testing refund processing..." << std::endl;
-        
-        // Create a completed payment first
-        Model::Payment payment;
-        payment.payment_id = 3;
-        payment.amount = 120.00;
-        payment.currency = "USD";
-        payment.payment_method = "Credit Card";
-        payment.transaction_id = "txn_test_003";
-        payment.status = Model::PaymentStatus::COMPLETED;
-        payment.payment_date_time = Model::DateTime::now();
-        
-        int payment_id = paymentModule.createPayment(payment);
-        assert(payment_id > 0);
-        
-        // Test full refund
-        std::string refund_transaction_id = paymentModule.processRefund(
-            payment_id, 
-            0.0, // full refund
-            "Customer requested refund"
-        );
-        
-        assert(!refund_transaction_id.empty());
-        
-        // Test partial refund
-        std::string partial_refund_id = paymentModule.processRefund(
-            payment_id,
-            50.00, // partial refund
-            "Partial service provided"
-        );
-        
-        assert(!partial_refund_id.empty());
-        
-        std::cout << "✅ Refund processing test passed" << std::endl;
-    }
-
-    /**
-     * @brief Test payment query operations
-     */
-    void testPaymentQueries() {
-        std::cout << "Testing payment queries..." << std::endl;
-        
-        // Create multiple test payments for the same attendee
-        int attendee_id = 456;
-        for (int i = 0; i < 3; i++) {
-            Model::Payment payment;
-            payment.payment_id = 10 + i;
-            payment.amount = 50.00 + (i * 10);
-            payment.currency = "USD";
-            payment.payment_method = "Credit Card";
-            payment.transaction_id = "txn_query_" + std::to_string(i);
-            payment.status = Model::PaymentStatus::COMPLETED;
-            payment.payment_date_time = Model::DateTime::now();
-            
-            paymentModule.createPayment(payment);
+// Test CREATE operation
+std::vector<std::shared_ptr<Model::Payment>> testCreateOperation(PaymentManager::PaymentModule& module) {
+    displayHeader("CREATE OPERATION TEST");
+    
+    std::vector<std::shared_ptr<Model::Payment>> createdPayments;
+    
+    // Create first payment
+    std::cout << "Creating payment 1 (USD Credit Card)..." << std::endl;
+    int paymentId1 = module.createPayment(1, 99.99, "USD", "Credit Card", "TXN001");
+    if (paymentId1 != -1) {
+        auto payment1 = module.getPaymentById(paymentId1);
+        if (payment1) {
+            createdPayments.push_back(payment1);
+            displayPayment(payment1);
+            displaySeparator();
         }
-        
-        // Test get payments by attendee
-        auto attendee_payments = paymentModule.getPaymentsByAttendee(attendee_id);
-        assert(attendee_payments.size() >= 3);
-        
-        // Test get payments by status
-        auto completed_payments = paymentModule.getPaymentsByStatus(Model::PaymentStatus::COMPLETED);
-        assert(completed_payments.size() > 0);
-        
-        std::cout << "✅ Payment queries test passed" << std::endl;
+    } else {
+        std::cout << "Failed to create payment 1" << std::endl;
     }
-
-    /**
-     * @brief Test payment analytics
-     */
-    void testPaymentAnalytics() {
-        std::cout << "Testing payment analytics..." << std::endl;
-        
-        // Get payment statistics
-        auto stats = paymentModule.getPaymentStatistics();
-        assert(stats.total_payments >= 0);
-        assert(stats.total_revenue >= 0.0);
-        
-        // Verify statistics make sense
-        assert(stats.total_payments == 
-               stats.completed_payments + stats.pending_payments + 
-               stats.failed_payments + stats.refunded_payments);
-        
-        std::cout << "✅ Payment analytics test passed" << std::endl;
+    
+    // Create second payment
+    std::cout << "Creating payment 2 (EUR PayPal)..." << std::endl;
+    int paymentId2 = module.createPayment(2, 149.50, "EUR", "PayPal", "TXN002");
+    if (paymentId2 != -1) {
+        auto payment2 = module.getPaymentById(paymentId2);
+        if (payment2) {
+            createdPayments.push_back(payment2);
+            displayPayment(payment2);
+            displaySeparator();
+        }
+    } else {
+        std::cout << "Failed to create payment 2" << std::endl;
     }
-
-    /**
-     * @brief Test transaction management
-     */
-    void testTransactionManagement() {
-        std::cout << "Testing transaction management..." << std::endl;
-        
-        // Test transaction callback handling
-        std::string test_transaction_id = "txn_callback_test";
-        bool handled = paymentModule.handleTransactionCallback(
-            test_transaction_id,
-            "completed",
-            "{\"gateway_response\": \"success\"}"
-        );
-        
-        // The result depends on implementation, but should not crash
-        std::cout << "Transaction callback handled: " << (handled ? "true" : "false") << std::endl;
-        
-        std::cout << "✅ Transaction management test passed" << std::endl;
+    
+    // Create third payment
+    std::cout << "Creating payment 3 (USD Debit Card)..." << std::endl;
+    int paymentId3 = module.createPayment(3, 75.25, "USD", "Debit Card", "TXN003");
+    if (paymentId3 != -1) {
+        auto payment3 = module.getPaymentById(paymentId3);
+        if (payment3) {
+            createdPayments.push_back(payment3);
+            displayPayment(payment3);
+            displaySeparator();
+        }
+    } else {
+        std::cout << "Failed to create payment 3" << std::endl;
     }
-
-    /**
-     * @brief Test payment validation
-     */
-    void testPaymentValidation() {
-        std::cout << "Testing payment validation..." << std::endl;
-        
-        // Test invalid transaction ID
-        bool is_valid = paymentModule.validateTransaction("invalid_transaction_id");
-        assert(!is_valid);
-        
-        // Test empty transaction ID
-        is_valid = paymentModule.validateTransaction("");
-        assert(!is_valid);
-        
-        std::cout << "✅ Payment validation test passed" << std::endl;
+    
+    // Test invalid payment creation (negative amount)
+    std::cout << "Testing invalid payment (negative amount)..." << std::endl;
+    int invalidPaymentId = module.createPayment(4, -50.0, "USD", "Credit Card", "TXN004");
+    if (invalidPaymentId == -1) {
+        std::cout << "Correctly rejected negative amount payment" << std::endl;
+    } else {
+        std::cout << "ERROR: Should have rejected negative amount payment" << std::endl;
     }
-
-    /**
-     * @brief Test recent payments functionality
-     */
-    void testRecentPayments() {
-        std::cout << "Testing recent payments..." << std::endl;
-        
-        // Get recent payments with default limit
-        auto recent_payments = paymentModule.getRecentPayments();
-        
-        // Get recent payments with custom limit
-        auto limited_payments = paymentModule.getRecentPayments(5);
-        assert(limited_payments.size() <= 5);
-        
-        std::cout << "✅ Recent payments test passed" << std::endl;
+    
+    // Test invalid payment creation (invalid currency)
+    std::cout << "Testing invalid payment (invalid currency)..." << std::endl;
+    int invalidPaymentId2 = module.createPayment(5, 50.0, "XYZ", "Credit Card", "TXN005");
+    if (invalidPaymentId2 == -1) {
+        std::cout << "Correctly rejected invalid currency payment" << std::endl;
+    } else {
+        std::cout << "ERROR: Should have rejected invalid currency payment" << std::endl;
     }
+    
+    return createdPayments;
+}
 
-    /**
-     * @brief Test date range queries
-     */
-    void testDateRangeQueries() {
-        std::cout << "Testing date range queries..." << std::endl;
-        
-        // Test with date range
-        std::string start_date = "2025-01-01T00:00:00Z";
-        std::string end_date = "2025-12-31T23:59:59Z";
-        
-        auto payments_in_range = paymentModule.getPaymentsByDateRange(start_date, end_date);
-        
-        // Should not crash and return valid results
-        std::cout << "Payments in date range: " << payments_in_range.size() << std::endl;
-        
-        std::cout << "✅ Date range queries test passed" << std::endl;
+// Test READ operations
+void testReadOperations(PaymentManager::PaymentModule& module, const std::vector<std::shared_ptr<Model::Payment>>& testPayments) {
+    displayHeader("READ OPERATIONS TEST");
+    
+    // Get payment by ID
+    if (!testPayments.empty()) {
+        int idToFind = testPayments[0]->payment_id;
+        std::cout << "1. Getting payment by ID " << idToFind << ":" << std::endl;
+        auto foundPayment = module.getPaymentById(idToFind);
+        if (foundPayment) {
+            displayPayment(foundPayment);
+        } else {
+            std::cout << "Payment not found!" << std::endl;
+        }
+        std::cout << std::endl;
     }
-
-    /**
-     * @brief Test revenue calculation
-     */
-    void testRevenueCalculation() {
-        std::cout << "Testing revenue calculation..." << std::endl;
-        
-        std::string start_date = "2025-01-01T00:00:00Z";
-        std::string end_date = "2025-12-31T23:59:59Z";
-        
-        // Test total revenue calculation
-        double total_revenue = paymentModule.calculateRevenue(start_date, end_date);
-        assert(total_revenue >= 0.0);
-        
-        // Test revenue for specific currency
-        double usd_revenue = paymentModule.calculateRevenue(start_date, end_date, "USD");
-        assert(usd_revenue >= 0.0);
-        
-        std::cout << "✅ Revenue calculation test passed" << std::endl;
+    
+    // Get payments by status
+    std::cout << "2. Getting payments by PENDING status:" << std::endl;
+    auto pendingPayments = module.getPaymentsByStatus(Model::PaymentStatus::PENDING);
+    displayPaymentList(pendingPayments);
+    std::cout << std::endl;
+    
+    // Get recent payments
+    std::cout << "3. Getting recent payments (limit 5):" << std::endl;
+    auto recentPayments = module.getRecentPayments(5);
+    displayPaymentList(recentPayments);
+    std::cout << std::endl;
+    
+    // Get payments by date range
+    std::cout << "4. Getting payments by date range (wide range):" << std::endl;
+    auto dateRangePayments = module.getPaymentsByDateRange("2020-01-01T00:00:00Z", "2030-12-31T23:59:59Z");
+    displayPaymentList(dateRangePayments);
+    std::cout << std::endl;
+    
+    // Test not finding a payment
+    std::cout << "5. Testing non-existent ID lookup:" << std::endl;
+    auto nonExistentPayment = module.getPaymentById(9999);
+    if (!nonExistentPayment) {
+        std::cout << "Correctly returned nullptr for non-existent ID 9999" << std::endl;
     }
+    std::cout << std::endl;
+}
 
-    /**
-     * @brief Test payment statistics
-     */
-    void testPaymentStatistics() {
-        std::cout << "Testing payment statistics..." << std::endl;
-        
-        auto stats = paymentModule.getPaymentStatistics();
-        
-        // Verify all fields are reasonable
-        assert(stats.total_payments >= 0);
-        assert(stats.completed_payments >= 0);
-        assert(stats.pending_payments >= 0);
-        assert(stats.failed_payments >= 0);
-        assert(stats.refunded_payments >= 0);
-        assert(stats.total_revenue >= 0.0);
-        assert(stats.average_payment_amount >= 0.0);
-        
-        std::cout << "Payment Statistics:" << std::endl;
-        std::cout << "  Total Payments: " << stats.total_payments << std::endl;
-        std::cout << "  Total Revenue: $" << stats.total_revenue << std::endl;
-        std::cout << "  Average Payment: $" << stats.average_payment_amount << std::endl;
-        std::cout << "  Most Used Method: " << stats.most_used_payment_method << std::endl;
-        
-        std::cout << "✅ Payment statistics test passed" << std::endl;
+// Test UPDATE operations
+void testUpdateOperations(PaymentManager::PaymentModule& module, const std::vector<std::shared_ptr<Model::Payment>>& testPayments) {
+    displayHeader("UPDATE OPERATIONS TEST");
+    
+    if (testPayments.empty()) {
+        std::cout << "No test payments available for update testing." << std::endl;
+        return;
     }
-
-    /**
-     * @brief Test payment report generation
-     */
-    void testPaymentReports() {
-        std::cout << "Testing payment report generation..." << std::endl;
-        
-        std::string start_date = "2025-01-01T00:00:00Z";
-        std::string end_date = "2025-12-31T23:59:59Z";
-        
-        // Generate payment report
-        std::string report = paymentModule.generatePaymentReport(start_date, end_date);
-        assert(!report.empty());
-        
-        std::cout << "Generated report length: " << report.length() << " characters" << std::endl;
-        
-        std::cout << "✅ Payment report generation test passed" << std::endl;
+    
+    // Update payment status to COMPLETED
+    int paymentIdToUpdate = testPayments[0]->payment_id;
+    std::cout << "1. Updating payment " << paymentIdToUpdate << " to COMPLETED status:" << std::endl;
+    bool updateSuccess = module.updatePaymentStatus(paymentIdToUpdate, Model::PaymentStatus::COMPLETED);
+    if (updateSuccess) {
+        auto updatedPayment = module.getPaymentById(paymentIdToUpdate);
+        if (updatedPayment) {
+            displayPayment(updatedPayment);
+        }
+    } else {
+        std::cout << "Failed to update payment status" << std::endl;
     }
-};
+    std::cout << std::endl;
+    
+    // Update another payment to FAILED
+    if (testPayments.size() > 1) {
+        int paymentIdToFail = testPayments[1]->payment_id;
+        std::cout << "2. Updating payment " << paymentIdToFail << " to FAILED status:" << std::endl;
+        bool failSuccess = module.updatePaymentStatus(paymentIdToFail, Model::PaymentStatus::FAILED);
+        if (failSuccess) {
+            auto failedPayment = module.getPaymentById(paymentIdToFail);
+            if (failedPayment) {
+                displayPayment(failedPayment);
+            }
+        } else {
+            std::cout << "Failed to update payment status" << std::endl;
+        }
+        std::cout << std::endl;
+    }
+    
+    // Test updating non-existent payment
+    std::cout << "3. Testing update of non-existent payment:" << std::endl;
+    bool invalidUpdate = module.updatePaymentStatus(9999, Model::PaymentStatus::COMPLETED);
+    if (!invalidUpdate) {
+        std::cout << "Correctly rejected update of non-existent payment" << std::endl;
+    } else {
+        std::cout << "ERROR: Should have rejected update of non-existent payment" << std::endl;
+    }
+    std::cout << std::endl;
+}
 
-/**
- * @brief Main function to run all payment module tests
- */
+// Test PAYMENT PROCESSING operations
+void testPaymentProcessing(PaymentManager::PaymentModule& module) {
+    displayHeader("PAYMENT PROCESSING TEST");
+    
+    // Test successful payment processing
+    std::cout << "1. Processing a new payment..." << std::endl;
+    std::string transactionId = module.processPayment(100, 250.0, "USD", "Credit Card");
+    if (!transactionId.empty()) {
+        std::cout << "Payment processed successfully with transaction ID: " << transactionId << std::endl;
+        
+        // Find the processed payment
+        auto recentPayments = module.getRecentPayments(5);
+        for (const auto& payment : recentPayments) {
+            if (payment->transaction_id == transactionId) {
+                displayPayment(payment);
+                break;
+            }
+        }
+    } else {
+        std::cout << "Failed to process payment" << std::endl;
+    }
+    std::cout << std::endl;
+    
+    // Test payment processing with invalid data
+    std::cout << "2. Testing payment processing with invalid data..." << std::endl;
+    std::string invalidTransaction = module.processPayment(101, -100.0, "USD", "Credit Card");
+    if (invalidTransaction.empty()) {
+        std::cout << "Correctly rejected invalid payment processing" << std::endl;
+    } else {
+        std::cout << "ERROR: Should have rejected invalid payment processing" << std::endl;
+    }
+    std::cout << std::endl;
+}
+
+// Test REFUND operations
+void testRefundOperations(PaymentManager::PaymentModule& module, const std::vector<std::shared_ptr<Model::Payment>>& testPayments) {
+    displayHeader("REFUND OPERATIONS TEST");
+    
+    if (testPayments.empty()) {
+        std::cout << "No test payments available for refund testing." << std::endl;
+        return;
+    }
+    
+    // First, ensure we have a completed payment to refund
+    int refundPaymentId = testPayments[0]->payment_id;
+    module.updatePaymentStatus(refundPaymentId, Model::PaymentStatus::COMPLETED);
+    
+    std::cout << "1. Processing full refund for payment " << refundPaymentId << ":" << std::endl;
+    std::string refundTransactionId = module.processRefund(refundPaymentId, 0.0, "Customer request");
+    if (!refundTransactionId.empty()) {
+        std::cout << "Refund processed successfully with transaction ID: " << refundTransactionId << std::endl;
+        
+        // Check original payment status
+        auto originalPayment = module.getPaymentById(refundPaymentId);
+        if (originalPayment) {
+            displayPayment(originalPayment);
+        }
+    } else {
+        std::cout << "Failed to process refund" << std::endl;
+    }
+    std::cout << std::endl;
+    
+    // Test partial refund
+    if (testPayments.size() > 2) {
+        int partialRefundPaymentId = testPayments[2]->payment_id;
+        module.updatePaymentStatus(partialRefundPaymentId, Model::PaymentStatus::COMPLETED);
+        
+        std::cout << "2. Processing partial refund for payment " << partialRefundPaymentId << ":" << std::endl;
+        std::string partialRefundId = module.processRefund(partialRefundPaymentId, 25.0, "Partial refund");
+        if (!partialRefundId.empty()) {
+            std::cout << "Partial refund processed successfully with transaction ID: " << partialRefundId << std::endl;
+            
+            // Check original payment status (should still be COMPLETED for partial refunds)
+            auto originalPayment = module.getPaymentById(partialRefundPaymentId);
+            if (originalPayment) {
+                displayPayment(originalPayment);
+            }
+        } else {
+            std::cout << "Failed to process partial refund" << std::endl;
+        }
+        std::cout << std::endl;
+    }
+    
+    // Test refund of non-existent payment
+    std::cout << "3. Testing refund of non-existent payment:" << std::endl;
+    std::string invalidRefund = module.processRefund(9999, 50.0, "Invalid refund");
+    if (invalidRefund.empty()) {
+        std::cout << "Correctly rejected refund of non-existent payment" << std::endl;
+    } else {
+        std::cout << "ERROR: Should have rejected refund of non-existent payment" << std::endl;
+    }
+    std::cout << std::endl;
+}
+
+// Test ANALYTICS operations
+void testAnalyticsOperations(PaymentManager::PaymentModule& module) {
+    displayHeader("ANALYTICS OPERATIONS TEST");
+    
+    // Test revenue calculation
+    std::cout << "1. Calculating total revenue:" << std::endl;
+    double totalRevenue = module.calculateRevenue("2020-01-01T00:00:00Z", "2030-12-31T23:59:59Z");
+    std::cout << "Total Revenue: $" << std::fixed << std::setprecision(2) << totalRevenue << std::endl;
+    std::cout << std::endl;
+    
+    // Test revenue by currency
+    std::cout << "2. Calculating USD revenue:" << std::endl;
+    double usdRevenue = module.calculateRevenue("2020-01-01T00:00:00Z", "2030-12-31T23:59:59Z", "USD");
+    std::cout << "USD Revenue: $" << std::fixed << std::setprecision(2) << usdRevenue << std::endl;
+    std::cout << std::endl;
+    
+    // Test payment statistics
+    std::cout << "3. Getting payment statistics:" << std::endl;
+    auto stats = module.getPaymentStatistics();
+    std::cout << "Total Payments: " << stats.total_payments << std::endl;
+    std::cout << "Completed Payments: " << stats.completed_payments << std::endl;
+    std::cout << "Pending Payments: " << stats.pending_payments << std::endl;
+    std::cout << "Failed Payments: " << stats.failed_payments << std::endl;
+    std::cout << "Refunded Payments: " << stats.refunded_payments << std::endl;
+    std::cout << "Total Revenue: $" << std::fixed << std::setprecision(2) << stats.total_revenue << std::endl;
+    std::cout << "Average Payment: $" << std::fixed << std::setprecision(2) << stats.average_payment_amount << std::endl;
+    std::cout << "Most Used Method: " << stats.most_used_payment_method << std::endl;
+    std::cout << std::endl;
+    
+    // Test payment report generation
+    std::cout << "4. Generating payment report:" << std::endl;
+    std::string report = module.generatePaymentReport("2020-01-01T00:00:00Z", "2030-12-31T23:59:59Z");
+    std::cout << report << std::endl;
+}
+
+// Test TRANSACTION MANAGEMENT operations
+void testTransactionManagement(PaymentManager::PaymentModule& module) {
+    displayHeader("TRANSACTION MANAGEMENT TEST");
+    
+    // Test transaction validation
+    std::cout << "1. Testing transaction validation:" << std::endl;
+    bool validTransaction = module.validateTransaction("TXN12345678");
+    std::cout << "Valid transaction ID (TXN12345678): " << (validTransaction ? "PASS" : "FAIL") << std::endl;
+    
+    bool invalidTransaction = module.validateTransaction("SHORT");
+    std::cout << "Invalid transaction ID (SHORT): " << (!invalidTransaction ? "PASS" : "FAIL") << std::endl;
+    
+    bool emptyTransaction = module.validateTransaction("");
+    std::cout << "Empty transaction ID: " << (!emptyTransaction ? "PASS" : "FAIL") << std::endl;
+    std::cout << std::endl;
+    
+    // Test transaction callback handling
+    std::cout << "2. Testing transaction callback handling:" << std::endl;
+    int callbackPaymentId = module.createPayment(200, 125.75, "USD", "Credit Card", "TXN_CALLBACK_TEST");
+    if (callbackPaymentId != -1) {
+        auto payment = module.getPaymentById(callbackPaymentId);
+        if (payment) {
+            // Test successful callback
+            bool callbackSuccess = module.handleTransactionCallback(payment->transaction_id, "completed", "Gateway response");
+            std::cout << "Successful callback handling: " << (callbackSuccess ? "PASS" : "FAIL") << std::endl;
+            
+            // Verify status was updated
+            payment = module.getPaymentById(callbackPaymentId);
+            if (payment && payment->status == Model::PaymentStatus::COMPLETED) {
+                std::cout << "Payment status updated by callback: PASS" << std::endl;
+            }
+            
+            // Test failed callback
+            bool failedCallback = module.handleTransactionCallback(payment->transaction_id, "failed", "Gateway error");
+            std::cout << "Failed callback handling: " << (failedCallback ? "PASS" : "FAIL") << std::endl;
+        }
+    }
+    
+    // Test callback for non-existent transaction
+    bool invalidCallback = module.handleTransactionCallback("NON_EXISTENT_TXN", "completed", "Response");
+    std::cout << "Invalid callback rejection: " << (!invalidCallback ? "PASS" : "FAIL") << std::endl;
+    std::cout << std::endl;
+}
+
 int main() {
+    std::cout << "\n\n";
+    displayHeader("PAYMENT MODULE COMPREHENSIVE TEST");
+    std::cout << "Date: " << Model::DateTime::now().iso8601String << "\n\n";
+    
+    // Create module instance
+    PaymentManager::PaymentModule module("test_payments.dat");
+    
+    // Vector to keep track of created payments for testing
+    std::vector<std::shared_ptr<Model::Payment>> testPayments;
+    
     try {
-        PaymentModuleTest test;
-        test.runAllTests();
+        // Test CREATE operations
+        testPayments = testCreateOperation(module);
+        std::cout << "\n\n";
         
-        std::cout << std::endl << "🎉 All PaymentModule tests completed successfully!" << std::endl;
-        return 0;
-    } catch (const std::exception& e) {
-        std::cerr << "💥 Test suite failed with exception: " << e.what() << std::endl;
+        // Test READ operations
+        testReadOperations(module, testPayments);
+        std::cout << "\n\n";
+        
+        // Test UPDATE operations
+        testUpdateOperations(module, testPayments);
+        std::cout << "\n\n";
+        
+        // Test PAYMENT PROCESSING operations
+        testPaymentProcessing(module);
+        std::cout << "\n\n";
+        
+        // Test REFUND operations
+        testRefundOperations(module, testPayments);
+        std::cout << "\n\n";
+        
+        // Test ANALYTICS operations
+        testAnalyticsOperations(module);
+        std::cout << "\n\n";
+        
+        // Test TRANSACTION MANAGEMENT operations
+        testTransactionManagement(module);
+        
+        displayHeader("TEST COMPLETED SUCCESSFULLY");
+    }
+    catch (const std::exception& e) {
+        std::cerr << "\n\nERROR: " << e.what() << std::endl;
         return 1;
     }
+    
+    return 0;
 }
