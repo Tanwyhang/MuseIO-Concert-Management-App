@@ -1,11 +1,6 @@
 #pragma once
-#include <st        /**
-         * @brief Constructor
-         * @param filePath Path to the report data file
-         */
-        ReportModule(const std::string& filePath) : BaseModule<Model::ConcertReport, int>(filePath) {
-            loadEntities();
-        }#include <vector>
+#include <string>
+#include <vector>
 #include <memory>
 #include <map>
 #include <optional>
