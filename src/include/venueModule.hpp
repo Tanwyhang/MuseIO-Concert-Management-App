@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <sstream>
+#include <iomanip>
 
 /**
  * @brief Module for managing Venue entities
@@ -211,7 +212,24 @@ public:
     }
 
     /**
-     * @brief Add a seat to a venue
+     * @brief Initialize the 2D seating plan for a venue
+     * @param venueId Venue ID
+     * @param numRows Number of rows in the seating plan
+     * @param numCols Number of columns in the seating plan
+     * @return true if successful
+     */
+    bool initializeVenueSeatingPlan(int venueId, int numRows, int numCols) {
+        auto venue = getById(venueId);
+        if (!venue) {
+            return false;
+        }
+        
+        venue->initializeSeatingPlan(numRows, numCols);
+        return saveEntities();
+    }
+
+    /**
+     * @brief Add a seat to a venue with 2D mapping
      * 
      * @param venueId Venue ID
      * @param seatType Seat type (e.g., "VIP", "Regular")
@@ -244,13 +262,30 @@ public:
         seat->col_number = column;
         seat->status = Model::TicketStatus::AVAILABLE;
         
-        // Add to venue
-        venue->seats.push_back(seat);
+        // Use venue's addSeat method which handles both linear and 2D mapping
+        venue->addSeat(seat);
         
         // Save changes
         saveEntities();
         
         return seat;
+    }
+
+    /**
+     * @brief Enhanced addSeat method with explicit 2D mapping
+     * @param venueId Venue ID
+     * @param seatType Seat type (e.g., "VIP", "Regular")
+     * @param row Row identifier
+     * @param column Column identifier
+     * @return std::shared_ptr<Model::Seat> Pointer to created seat or nullptr on failure
+     */
+    std::shared_ptr<Model::Seat> addSeatWithMapping(
+        int venueId,
+        const std::string& seatType,
+        const std::string& row,
+        const std::string& column
+    ) {
+        return addSeat(venueId, seatType, row, column);
     }
 
     /**
@@ -339,6 +374,257 @@ public:
     }
 
     /**
+     * @brief Get seats in a specific row using 2D array access
+     * @param venueId Venue ID
+     * @param rowIndex Zero-based row index
+     * @return std::vector<std::shared_ptr<Model::Seat>> Seats in the row
+     */
+    std::vector<std::shared_ptr<Model::Seat>> getSeatsInRow(int venueId, int rowIndex) {
+        auto venue = getById(venueId);
+        if (!venue || rowIndex < 0 || rowIndex >= venue->rows) {
+            return {};
+        }
+        
+        std::vector<std::shared_ptr<Model::Seat>> rowSeats;
+        for (int col = 0; col < venue->columns; col++) {
+            auto seat = venue->getSeatAt(rowIndex, col);
+            if (seat) {
+                rowSeats.push_back(seat);
+            }
+        }
+        
+        return rowSeats;
+    }
+
+    /**
+     * @brief Get a specific seat using 2D coordinates
+     * @param venueId Venue ID
+     * @param row Zero-based row index
+     * @param col Zero-based column index
+     * @return std::shared_ptr<Model::Seat> Seat at position or nullptr
+     */
+    std::shared_ptr<Model::Seat> getSeatAt(int venueId, int row, int col) {
+        auto venue = getById(venueId);
+        if (!venue) {
+            return nullptr;
+        }
+        
+        return venue->getSeatAt(row, col);
+    }
+
+    /**
+     * @brief Find adjacent available seats for group booking
+     * @param venueId Venue ID
+     * @param numSeats Number of adjacent seats needed
+     * @return std::vector<std::vector<std::shared_ptr<Model::Seat>>> Vector of possible seat groups
+     */
+    std::vector<std::vector<std::shared_ptr<Model::Seat>>> findAdjacentSeats(
+        int venueId, 
+        int numSeats
+    ) {
+        auto venue = getById(venueId);
+        if (!venue || numSeats <= 0) {
+            return {};
+        }
+        
+        std::vector<std::vector<std::shared_ptr<Model::Seat>>> adjacentGroups;
+        
+        // Check each row for consecutive available seats
+        for (int row = 0; row < venue->rows; row++) {
+            for (int col = 0; col <= venue->columns - numSeats; col++) {
+                std::vector<std::shared_ptr<Model::Seat>> group;
+                bool validGroup = true;
+                
+                // Check if we can get numSeats consecutive seats
+                for (int i = 0; i < numSeats; i++) {
+                    auto seat = venue->getSeatAt(row, col + i);
+                    if (!seat || seat->status != Model::TicketStatus::AVAILABLE) {
+                        validGroup = false;
+                        break;
+                    }
+                    group.push_back(seat);
+                }
+                
+                if (validGroup && group.size() == static_cast<size_t>(numSeats)) {
+                    adjacentGroups.push_back(group);
+                }
+            }
+        }
+        
+        return adjacentGroups;
+    }
+
+    /**
+     * @brief Get seating plan visualization as a 2D string representation
+     * @param venueId Venue ID
+     * @return std::string ASCII representation of the seating plan
+     */
+    std::string getSeatingPlanVisualization(int venueId) {
+        auto venue = getById(venueId);
+        if (!venue) {
+            return "Venue not found";
+        }
+        
+        if (venue->seatingPlan.empty()) {
+            return "Seating plan not initialized. Use initializeVenueSeatingPlan() first.";
+        }
+        
+        std::ostringstream visualization;
+        visualization << "Seating Plan for " << venue->name << ":\n";
+        visualization << "Legend: [A]=Available, [S]=Sold, [C]=Checked In, [X]=Unavailable\n\n";
+        
+        // Column headers
+        visualization << "   ";
+        for (int col = 0; col < venue->columns; col++) {
+            visualization << std::setw(3) << (col + 1);
+        }
+        visualization << "\n";
+        
+        // Rows with seats
+        for (int row = 0; row < venue->rows; row++) {
+            char rowLabel = (row < 26) ? ('A' + row) : ('A' + (row / 26 - 1)) + ('A' + (row % 26));
+            visualization << std::setw(2) << rowLabel << " ";
+            
+            for (int col = 0; col < venue->columns; col++) {
+                auto seat = venue->getSeatAt(row, col);
+                if (!seat) {
+                    visualization << " --";
+                } else {
+                    switch (seat->status) {
+                        case Model::TicketStatus::AVAILABLE:
+                            visualization << " [A]";
+                            break;
+                        case Model::TicketStatus::SOLD:
+                            visualization << " [S]";
+                            break;
+                        case Model::TicketStatus::CHECKED_IN:
+                            visualization << " [C]";
+                            break;
+                        default:
+                            visualization << " [X]";
+                            break;
+                    }
+                }
+            }
+            visualization << "\n";
+        }
+        
+        return visualization.str();
+    }
+
+    /**
+     * @brief Bulk seat creation for standard rectangular venues
+     * @param venueId Venue ID
+     * @param numRows Number of rows
+     * @param seatsPerRow Number of seats per row
+     * @param defaultSeatType Default seat type (e.g., "Regular")
+     * @return true if successful
+     */
+    bool createStandardSeatingPlan(
+        int venueId,
+        int numRows,
+        int seatsPerRow,
+        const std::string& defaultSeatType = "Regular"
+    ) {
+        auto venue = getById(venueId);
+        if (!venue) {
+            return false;
+        }
+        
+        // Initialize the 2D seating plan
+        venue->initializeSeatingPlan(numRows, seatsPerRow);
+        
+        // Create seats for each position
+        for (int row = 0; row < numRows; row++) {
+            for (int col = 0; col < seatsPerRow; col++) {
+                char rowChar = (row < 26) ? ('A' + row) : ('A' + (row / 26 - 1)) + ('A' + (row % 26));
+                std::string rowName(1, rowChar);
+                std::string colName = std::to_string(col + 1);
+                
+                addSeat(venueId, defaultSeatType, rowName, colName);
+            }
+        }
+        
+        return saveEntities();
+    }
+
+    /**
+     * @brief Reserve a block of seats for group booking
+     * @param venueId Venue ID
+     * @param seats Vector of seats to reserve
+     * @return true if all seats were successfully reserved
+     */
+    bool reserveSeatBlock(int venueId, const std::vector<std::shared_ptr<Model::Seat>>& seats) {
+        auto venue = getById(venueId);
+        if (!venue) {
+            return false;
+        }
+        
+        // First check if all seats are available
+        for (const auto& seat : seats) {
+            if (!seat || seat->status != Model::TicketStatus::AVAILABLE) {
+                return false; // Cannot reserve block if any seat is unavailable
+            }
+        }
+        
+        // Reserve all seats
+        for (const auto& seat : seats) {
+            seat->status = Model::TicketStatus::SOLD;
+        }
+        
+        return saveEntities();
+    }
+
+    /**
+     * @brief Get venue seating statistics
+     * @param venueId Venue ID
+     * @return std::string Statistics summary
+     */
+    std::string getVenueSeatingStats(int venueId) {
+        auto venue = getById(venueId);
+        if (!venue) {
+            return "Venue not found";
+        }
+        
+        int totalSeats = static_cast<int>(venue->seats.size());
+        int availableSeats = 0;
+        int soldSeats = 0;
+        int checkedInSeats = 0;
+        
+        for (const auto& seat : venue->seats) {
+            switch (seat->status) {
+                case Model::TicketStatus::AVAILABLE:
+                    availableSeats++;
+                    break;
+                case Model::TicketStatus::SOLD:
+                    soldSeats++;
+                    break;
+                case Model::TicketStatus::CHECKED_IN:
+                    checkedInSeats++;
+                    break;
+                default:
+                    break;
+            }
+        }
+        
+        std::ostringstream stats;
+        stats << "Venue: " << venue->name << "\n";
+        stats << "Total Seats: " << totalSeats << "\n";
+        stats << "Available: " << availableSeats << " (" << 
+                 (totalSeats > 0 ? (availableSeats * 100 / totalSeats) : 0) << "%)\n";
+        stats << "Sold: " << soldSeats << " (" << 
+                 (totalSeats > 0 ? (soldSeats * 100 / totalSeats) : 0) << "%)\n";
+        stats << "Checked In: " << checkedInSeats << " (" << 
+                 (totalSeats > 0 ? (checkedInSeats * 100 / totalSeats) : 0) << "%)\n";
+        
+        if (venue->rows > 0 && venue->columns > 0) {
+            stats << "Layout: " << venue->rows << " rows × " << venue->columns << " columns\n";
+        }
+        
+        return stats.str();
+    }
+
+    /**
      * @brief Delete a venue
      * @param id Venue ID to delete
      * @return true if deletion successful
@@ -392,9 +678,18 @@ protected:
             venue->contact_info = readString(file);
             venue->seatmap = readString(file);
             
+            // Read 2D seating plan dimensions (new format)
+            readBinary(file, venue->rows);
+            readBinary(file, venue->columns);
+            
             // Read seats
             int seatCount = 0;
             readBinary(file, seatCount);
+            
+            // Initialize 2D seating plan if dimensions are set
+            if (venue->rows > 0 && venue->columns > 0) {
+                venue->initializeSeatingPlan(venue->rows, venue->columns);
+            }
             
             for (int j = 0; j < seatCount; j++) {
                 auto seat = std::make_shared<Model::Seat>();
@@ -407,7 +702,8 @@ protected:
                 readBinary(file, statusInt);
                 seat->status = static_cast<Model::TicketStatus>(statusInt);
                 
-                venue->seats.push_back(seat);
+                // Use venue's addSeat method to handle both linear and 2D mapping
+                venue->addSeat(seat);
             }
             
             entities.push_back(venue);
@@ -447,6 +743,10 @@ protected:
             writeString(file, venue->description);
             writeString(file, venue->contact_info);
             writeString(file, venue->seatmap);
+            
+            // Write 2D seating plan dimensions (new format)
+            writeBinary(file, venue->rows);
+            writeBinary(file, venue->columns);
             
             // Write seats
             int seatCount = static_cast<int>(venue->seats.size());
@@ -503,6 +803,21 @@ namespace VenueManager {
         return getModule().findVenuesByName(nameQuery);
     }
 
+    // Function to find venues by city
+    std::vector<std::shared_ptr<Model::Venue>> findVenuesByCity(const std::string& city) {
+        return getModule().findVenuesByCity(city);
+    }
+
+    // Function to find venues by minimum capacity
+    std::vector<std::shared_ptr<Model::Venue>> findVenuesByCapacity(int minCapacity) {
+        return getModule().findVenuesByCapacity(minCapacity);
+    }
+
+    // Function to get all venues
+    const std::vector<std::shared_ptr<Model::Venue>>& getAllVenues() {
+        return getModule().getAllVenues();
+    }
+
     // Function to update venue information
     bool updateVenue(int id, const std::string& name = "", const std::string& address = "",
                      const std::string& city = "", const std::string& state = "",
@@ -527,5 +842,63 @@ namespace VenueManager {
     // Function to get available seats
     std::vector<std::shared_ptr<Model::Seat>> getAvailableSeats(int venueId) {
         return getModule().getAvailableSeats(venueId);
+    }
+
+    // NEW 2D Array Functions
+
+    // Initialize venue seating plan
+    bool initializeVenueSeatingPlan(int venueId, int numRows, int numCols) {
+        return getModule().initializeVenueSeatingPlan(venueId, numRows, numCols);
+    }
+
+    // Get seats in a specific row
+    std::vector<std::shared_ptr<Model::Seat>> getSeatsInRow(int venueId, int rowIndex) {
+        return getModule().getSeatsInRow(venueId, rowIndex);
+    }
+
+    // Get seat at specific coordinates
+    std::shared_ptr<Model::Seat> getSeatAt(int venueId, int row, int col) {
+        return getModule().getSeatAt(venueId, row, col);
+    }
+
+    // Find adjacent seats for group booking
+    std::vector<std::vector<std::shared_ptr<Model::Seat>>> findAdjacentSeats(int venueId, int numSeats) {
+        return getModule().findAdjacentSeats(venueId, numSeats);
+    }
+
+    // Get visual representation of seating plan
+    std::string getSeatingPlanVisualization(int venueId) {
+        return getModule().getSeatingPlanVisualization(venueId);
+    }
+
+    // Create standard rectangular seating plan
+    bool createStandardSeatingPlan(int venueId, int numRows, int seatsPerRow, 
+                                   const std::string& defaultSeatType = "Regular") {
+        return getModule().createStandardSeatingPlan(venueId, numRows, seatsPerRow, defaultSeatType);
+    }
+
+    // Reserve a block of seats
+    bool reserveSeatBlock(int venueId, const std::vector<std::shared_ptr<Model::Seat>>& seats) {
+        return getModule().reserveSeatBlock(venueId, seats);
+    }
+
+    // Get venue seating statistics
+    std::string getVenueSeatingStats(int venueId) {
+        return getModule().getVenueSeatingStats(venueId);
+    }
+
+    // Remove a seat
+    bool removeSeat(int venueId, int seatId) {
+        return getModule().removeSeat(venueId, seatId);
+    }
+
+    // Update seat status
+    bool updateSeatStatus(int venueId, int seatId, Model::TicketStatus status) {
+        return getModule().updateSeatStatus(venueId, seatId, status);
+    }
+
+    // Get all seats for a venue
+    std::vector<std::shared_ptr<Model::Seat>> getSeatsForVenue(int venueId) {
+        return getModule().getSeatsForVenue(venueId);
     }
 }

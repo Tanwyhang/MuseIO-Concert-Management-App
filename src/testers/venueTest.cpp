@@ -3,30 +3,50 @@
 #include <string>
 #include <iomanip>
 #include <vector>
+#include <cassert>
 #include "../include/models.hpp"
 #include "../include/venueModule.hpp"
 
+// Test result counters
+int testsPassed = 0;
+int testsFailed = 0;
+
 // Utility function to display a separator line
-void displaySeparator(char symbol = '-', int length = 50) {
+void displaySeparator(char symbol = '-', int length = 60) {
     std::cout << std::string(length, symbol) << std::endl;
 }
 
 // Utility function to display a section header
 void displayHeader(const std::string& title) {
     displaySeparator('=');
-    std::cout << title << std::endl;
+    std::cout << "  " << title << std::endl;
     displaySeparator('=');
 }
 
-// Utility function for displaying seat status
-std::string getSeatStatusString(Model::TicketStatus status) {
+// Utility function to display test results
+void displayTestResult(const std::string& testName, bool passed, const std::string& details = "") {
+    std::cout << "[" << (passed ? "PASS" : "FAIL") << "] " << testName;
+    if (!details.empty()) {
+        std::cout << " - " << details;
+    }
+    std::cout << std::endl;
+    
+    if (passed) {
+        testsPassed++;
+    } else {
+        testsFailed++;
+    }
+}
+
+// Utility function for displaying ticket status
+std::string getTicketStatusString(Model::TicketStatus status) {
     switch (status) {
-        case Model::TicketStatus::AVAILABLE:   return "AVAILABLE";
-        case Model::TicketStatus::SOLD:        return "SOLD";
-        case Model::TicketStatus::CHECKED_IN:  return "CHECKED_IN";
-        case Model::TicketStatus::CANCELLED:   return "CANCELLED";
-        case Model::TicketStatus::EXPIRED:     return "EXPIRED";
-        default:                              return "UNKNOWN";
+        case Model::TicketStatus::AVAILABLE:    return "AVAILABLE";
+        case Model::TicketStatus::SOLD:         return "SOLD";
+        case Model::TicketStatus::CHECKED_IN:   return "CHECKED_IN";
+        case Model::TicketStatus::CANCELLED:    return "CANCELLED";
+        case Model::TicketStatus::EXPIRED:      return "EXPIRED";
+        default:                                return "UNKNOWN";
     }
 }
 
@@ -42,496 +62,455 @@ void displayVenue(const std::shared_ptr<Model::Venue>& venue, bool detailed = tr
     
     if (detailed) {
         std::cout << "Address: " << venue->address << std::endl;
-        std::cout << "City: " << venue->city << std::endl;
-        std::cout << "State: " << venue->state << std::endl;
-        std::cout << "ZIP Code: " << venue->zip_code << std::endl;
+        std::cout << "City: " << venue->city << ", " << venue->state << " " << venue->zip_code << std::endl;
         std::cout << "Country: " << venue->country << std::endl;
         std::cout << "Capacity: " << venue->capacity << std::endl;
-        std::cout << "Description: " << venue->description << std::endl;
-        std::cout << "Contact: " << venue->contact_info << std::endl;
+        std::cout << "Description: " << (venue->description.empty() ? "[None]" : venue->description) << std::endl;
+        std::cout << "Contact: " << (venue->contact_info.empty() ? "[None]" : venue->contact_info) << std::endl;
         std::cout << "Seatmap: " << (venue->seatmap.empty() ? "[None]" : venue->seatmap) << std::endl;
-        std::cout << "Number of Seats: " << venue->seats.size() << std::endl;
+        std::cout << "Seat Count: " << venue->seats.size() << std::endl;
+        
+        if (venue->rows > 0 && venue->columns > 0) {
+            std::cout << "2D Layout: " << venue->rows << " rows × " << venue->columns << " columns" << std::endl;
+        } else {
+            std::cout << "2D Layout: Not initialized" << std::endl;
+        }
     }
 }
 
 // Display a collection of venues
-void displayVenueList(const std::vector<std::shared_ptr<Model::Venue>>& venues) {
+void displayVenues(const std::vector<std::shared_ptr<Model::Venue>>& venues, const std::string& title = "Venues") {
+    std::cout << "\n" << title << " (" << venues.size() << " found):" << std::endl;
+    displaySeparator('-', 40);
+    
     if (venues.empty()) {
         std::cout << "No venues found." << std::endl;
         return;
     }
     
-    std::cout << "Found " << venues.size() << " venue(s):" << std::endl;
-    displaySeparator();
-    
-    // Table header
-    std::cout << std::setw(5) << "ID"
-              << std::setw(25) << "Name"
-              << std::setw(20) << "City"
-              << std::setw(15) << "Capacity"
-              << std::setw(10) << "Seats" << std::endl;
-    displaySeparator();
-    
-    // Table rows
-    for (const auto& venue : venues) {
-        std::cout << std::setw(5) << venue->id
-                  << std::setw(25) << venue->name
-                  << std::setw(20) << venue->city
-                  << std::setw(15) << venue->capacity
-                  << std::setw(10) << venue->seats.size() << std::endl;
+    for (size_t i = 0; i < venues.size(); i++) {
+        std::cout << "[" << (i + 1) << "] ";
+        displayVenue(venues[i], false);
+        std::cout << std::endl;
     }
-    displaySeparator();
 }
 
-// Display a collection of seats
-void displaySeatList(const std::vector<std::shared_ptr<Model::Seat>>& seats) {
-    if (seats.empty()) {
-        std::cout << "No seats found." << std::endl;
-        return;
-    }
+// Test basic venue CRUD operations
+void testBasicVenueCRUD() {
+    displayHeader("Testing Basic Venue CRUD Operations");
     
-    std::cout << "Found " << seats.size() << " seat(s):" << std::endl;
-    displaySeparator();
-    
-    // Table header
-    std::cout << std::setw(5) << "ID"
-              << std::setw(15) << "Type"
-              << std::setw(10) << "Row"
-              << std::setw(10) << "Column"
-              << std::setw(15) << "Status" << std::endl;
-    displaySeparator();
-    
-    // Table rows
-    for (const auto& seat : seats) {
-        std::cout << std::setw(5) << seat->seat_id
-                  << std::setw(15) << seat->seat_type
-                  << std::setw(10) << seat->row_number
-                  << std::setw(10) << seat->col_number
-                  << std::setw(15) << getSeatStatusString(seat->status) << std::endl;
-    }
-    displaySeparator();
-}
-
-// Test CREATE operation
-std::vector<std::shared_ptr<Model::Venue>> testCreateOperation(VenueModule& module) {
-    displayHeader("CREATE OPERATION TEST");
-    
-    std::vector<std::shared_ptr<Model::Venue>> createdVenues;
-    
-    // Create first venue
-    std::cout << "Creating first venue..." << std::endl;
-    auto venue1 = module.createVenue(
-        "Grand Concert Hall",
-        "123 Music Street",
+    // Test 1: Create a venue
+    auto venue1 = VenueManager::createVenue(
+        "Madison Square Garden",
+        "4 Pennsylvania Plaza",
         "New York",
         "NY",
         "10001",
         "USA",
-        5000,
-        "A prestigious concert hall in downtown Manhattan",
-        "info@grandconcerthall.com",
-        "seatmap_grand_hall.png"
+        20000,
+        "Iconic entertainment venue in the heart of Manhattan",
+        "info@msg.com",
+        "https://msg.com/seatmap"
     );
-    createdVenues.push_back(venue1);
-    displayVenue(venue1);
-    displaySeparator();
     
-    // Create second venue
-    std::cout << "Creating second venue..." << std::endl;
-    auto venue2 = module.createVenue(
-        "Riverside Amphitheater",
-        "456 River Road",
-        "Chicago",
-        "IL",
-        "60601",
+    displayTestResult("Create venue", venue1 != nullptr, "Madison Square Garden");
+    if (venue1) {
+        std::cout << "Created venue details:" << std::endl;
+        displayVenue(venue1);
+        std::cout << std::endl;
+    }
+    
+    // Test 2: Get venue by ID
+    if (venue1) {
+        auto retrievedVenue = VenueManager::getVenueById(venue1->id);
+        displayTestResult("Get venue by ID", 
+            retrievedVenue != nullptr && retrievedVenue->id == venue1->id,
+            "ID: " + std::to_string(venue1->id));
+    }
+    
+    // Test 3: Create another venue for testing
+    auto venue2 = VenueManager::createVenue(
+        "Apollo Theater",
+        "253 W 125th St",
+        "New York",
+        "NY",
+        "10027",
         "USA",
-        8000,
-        "Outdoor amphitheater overlooking the river",
-        "contact@riversideamphitheater.com"
+        1506,
+        "Historic theater in Harlem",
+        "contact@apollotheater.org"
     );
-    createdVenues.push_back(venue2);
-    displayVenue(venue2);
-    displaySeparator();
     
-    // Create third venue
-    std::cout << "Creating third venue..." << std::endl;
-    auto venue3 = module.createVenue(
-        "City Arena",
-        "789 Main Street",
-        "Los Angeles",
-        "CA",
-        "90001",
-        "USA",
-        15000,
-        "Multi-purpose arena for concerts and sporting events",
-        "info@cityarena.com",
-        "arena_layout.pdf"
-    );
-    createdVenues.push_back(venue3);
-    displayVenue(venue3);
-    displaySeparator();
+    displayTestResult("Create second venue", venue2 != nullptr, "Apollo Theater");
     
-    return createdVenues;
+    // Test 4: Find venues by name
+    auto foundByName = VenueManager::findVenuesByName("madison");
+    displayTestResult("Find venues by name (case insensitive)", 
+        foundByName.size() >= 1, "Found " + std::to_string(foundByName.size()) + " venue(s)");
+    
+    // Test 5: Find venues by city
+    auto foundByCity = VenueManager::findVenuesByCity("New York");
+    displayTestResult("Find venues by city", 
+        foundByCity.size() >= 2, "Found " + std::to_string(foundByCity.size()) + " venue(s) in NYC");
+    
+    // Test 6: Find venues by capacity
+    auto foundByCapacity = VenueManager::findVenuesByCapacity(10000);
+    displayTestResult("Find venues by minimum capacity", 
+        foundByCapacity.size() >= 1, "Found " + std::to_string(foundByCapacity.size()) + " large venue(s)");
+    
+    // Test 7: Update venue
+    bool updateSuccess = false;
+    if (venue1) {
+        updateSuccess = VenueManager::updateVenue(
+            venue1->id,
+            "", // Don't change name
+            "", // Don't change address
+            "", // Don't change city
+            "", // Don't change state
+            "", // Don't change zip
+            "", // Don't change country
+            20100, // Update capacity
+            "The world's most famous arena - updated!", // Update description
+            "newinfo@msg.com" // Update contact
+        );
+    }
+    displayTestResult("Update venue", updateSuccess, "Updated capacity and description");
+    
+    if (updateSuccess && venue1) {
+        auto updatedVenue = VenueManager::getVenueById(venue1->id);
+        std::cout << "Updated venue details:" << std::endl;
+        displayVenue(updatedVenue);
+        std::cout << std::endl;
+    }
 }
 
-// Test adding seats to venues
-void testAddSeats(VenueModule& module, const std::vector<std::shared_ptr<Model::Venue>>& testVenues) {
-    displayHeader("ADD SEATS TEST");
+// Test 2D seating plan functionality
+void test2DSeatingPlan() {
+    displayHeader("Testing 2D Seating Plan Functionality");
     
-    if (testVenues.empty()) {
-        std::cout << "No test venues available for adding seats." << std::endl;
+    // Create a test venue for 2D operations
+    auto testVenue = VenueManager::createVenue(
+        "Test Theater",
+        "123 Test Street",
+        "Test City",
+        "TS",
+        "12345",
+        "USA",
+        100,
+        "Theater for testing 2D seating"
+    );
+    
+    displayTestResult("Create test venue for 2D operations", testVenue != nullptr);
+    
+    if (!testVenue) {
+        std::cout << "Cannot proceed with 2D tests - venue creation failed" << std::endl;
         return;
     }
     
-    // Add seats to the first venue (multiple sections, rows, and columns)
-    int venueId = testVenues[0]->id;
-    std::cout << "Adding seats to venue ID " << venueId << " (" << testVenues[0]->name << "):" << std::endl;
+    int venueId = testVenue->id;
     
-    // Add VIP section seats
-    for (char row = 'A'; row <= 'C'; row++) {
-        for (int col = 1; col <= 10; col++) {
-            std::string rowStr(1, row);
-            std::string colStr = std::to_string(col);
-            module.addSeat(venueId, "VIP", rowStr, colStr);
-        }
+    // Test 1: Initialize 2D seating plan
+    bool initSuccess = VenueManager::initializeVenueSeatingPlan(venueId, 5, 10);
+    displayTestResult("Initialize 2D seating plan (5x10)", initSuccess);
+    
+    // Test 2: Create standard seating plan
+    bool createSuccess = VenueManager::createStandardSeatingPlan(venueId, 5, 10, "Regular");
+    displayTestResult("Create standard seating plan", createSuccess, "50 seats (5 rows × 10 columns)");
+    
+    // Test 3: Get venue statistics
+    std::string stats = VenueManager::getVenueSeatingStats(venueId);
+    displayTestResult("Get venue seating statistics", !stats.empty());
+    std::cout << "\nVenue Statistics:\n" << stats << std::endl;
+    
+    // Test 4: Get seat at specific coordinates
+    auto seatA5 = VenueManager::getSeatAt(venueId, 0, 4); // Row A, Column 5
+    displayTestResult("Get seat at specific coordinates (A5)", 
+        seatA5 != nullptr && seatA5->row_number == "A" && seatA5->col_number == "5");
+    
+    if (seatA5) {
+        std::cout << "Seat A5 details: " << seatA5->row_number << seatA5->col_number 
+                  << " (ID: " << seatA5->seat_id << ", Type: " << seatA5->seat_type 
+                  << ", Status: " << getTicketStatusString(seatA5->status) << ")" << std::endl;
     }
     
-    // Add Regular section seats
-    for (char row = 'D'; row <= 'J'; row++) {
-        for (int col = 1; col <= 15; col++) {
-            std::string rowStr(1, row);
-            std::string colStr = std::to_string(col);
-            module.addSeat(venueId, "Regular", rowStr, colStr);
-        }
-    }
+    // Test 5: Get seats in a specific row
+    auto rowBSeats = VenueManager::getSeatsInRow(venueId, 1); // Row B (index 1)
+    displayTestResult("Get seats in row B", rowBSeats.size() == 10, 
+        "Retrieved " + std::to_string(rowBSeats.size()) + " seats");
     
-    // Add Balcony section seats
-    for (char row = 'K'; row <= 'M'; row++) {
-        for (int col = 1; col <= 20; col++) {
-            std::string rowStr(1, row);
-            std::string colStr = std::to_string(col);
-            module.addSeat(venueId, "Balcony", rowStr, colStr);
-        }
-    }
+    // Test 6: Get all seats for venue
+    auto allSeats = VenueManager::getSeatsForVenue(venueId);
+    displayTestResult("Get all seats for venue", allSeats.size() == 50, 
+        "Retrieved " + std::to_string(allSeats.size()) + " total seats");
     
-    std::cout << "Seats added successfully." << std::endl;
-    
-    // Show some seat statistics
-    auto allSeats = module.getSeatsForVenue(venueId);
-    std::cout << "\nTotal seats added: " << allSeats.size() << std::endl;
-    
-    // Count by type
-    int vipSeats = 0, regularSeats = 0, balconySeats = 0;
-    for (const auto& seat : allSeats) {
-        if (seat->seat_type == "VIP") vipSeats++;
-        else if (seat->seat_type == "Regular") regularSeats++;
-        else if (seat->seat_type == "Balcony") balconySeats++;
-    }
-    
-    std::cout << "VIP Seats: " << vipSeats << std::endl;
-    std::cout << "Regular Seats: " << regularSeats << std::endl;
-    std::cout << "Balcony Seats: " << balconySeats << std::endl;
-    
-    // Display a sample of seats
-    std::cout << "\nSample of seats from each section:" << std::endl;
-    
-    // Find a seat from each section
-    std::shared_ptr<Model::Seat> vipSample, regularSample, balconySample;
-    for (const auto& seat : allSeats) {
-        if (seat->seat_type == "VIP" && !vipSample) vipSample = seat;
-        else if (seat->seat_type == "Regular" && !regularSample) regularSample = seat;
-        else if (seat->seat_type == "Balcony" && !balconySample) balconySample = seat;
-        
-        if (vipSample && regularSample && balconySample) break;
-    }
-    
-    std::vector<std::shared_ptr<Model::Seat>> sampleSeats;
-    if (vipSample) sampleSeats.push_back(vipSample);
-    if (regularSample) sampleSeats.push_back(regularSample);
-    if (balconySample) sampleSeats.push_back(balconySample);
-    
-    displaySeatList(sampleSeats);
+    // Test 7: Get available seats
+    auto availableSeats = VenueManager::getAvailableSeats(venueId);
+    displayTestResult("Get available seats", availableSeats.size() == 50, 
+        "All " + std::to_string(availableSeats.size()) + " seats available");
 }
 
-// Test READ operations
-void testReadOperations(VenueModule& module, const std::vector<std::shared_ptr<Model::Venue>>& testVenues) {
-    displayHeader("READ OPERATIONS TEST");
+// Test advanced 2D operations
+void testAdvanced2DOperations() {
+    displayHeader("Testing Advanced 2D Operations");
     
-    // Get all venues
-    std::cout << "1. Getting all venues:" << std::endl;
-    auto allVenues = module.getAllVenues();
-    displayVenueList(allVenues);
+    // Create a venue for advanced testing
+    auto advancedVenue = VenueManager::createVenue(
+        "Advanced Test Arena",
+        "456 Advanced Ave",
+        "Test City",
+        "TS",
+        "12346",
+        "USA",
+        200
+    );
     
-    // Get venue by ID
-    if (!testVenues.empty()) {
-        int idToFind = testVenues[0]->id;
-        std::cout << "\n2. Getting venue by ID " << idToFind << ":" << std::endl;
-        auto foundVenue = module.getVenueById(idToFind);
-        if (foundVenue) {
-            displayVenue(foundVenue);
-        }
-    }
-    
-    // Find venues by name (partial match)
-    std::cout << "\n3. Finding venues by name (contains 'Arena'):" << std::endl;
-    auto nameResults = module.findVenuesByName("Arena");
-    displayVenueList(nameResults);
-    
-    // Find venues by city
-    std::cout << "\n4. Finding venues by city (Chicago):" << std::endl;
-    auto cityResults = module.findVenuesByCity("Chicago");
-    displayVenueList(cityResults);
-    
-    // Find venues by minimum capacity
-    std::cout << "\n5. Finding venues with capacity >= 10000:" << std::endl;
-    auto capacityResults = module.findVenuesByCapacity(10000);
-    displayVenueList(capacityResults);
-    
-    // Test not finding a venue
-    std::cout << "\n6. Testing non-existent ID lookup:" << std::endl;
-    auto nonExistentVenue = module.getVenueById(9999);
-    if (!nonExistentVenue) {
-        std::cout << "Correctly returned nullptr for non-existent ID 9999" << std::endl;
-    }
-}
-
-// Test UPDATE operations
-void testUpdateOperations(VenueModule& module, const std::vector<std::shared_ptr<Model::Venue>>& testVenues) {
-    displayHeader("UPDATE OPERATIONS TEST");
-    
-    if (testVenues.empty()) {
-        std::cout << "No test venues available for update testing." << std::endl;
+    if (!advancedVenue) {
+        std::cout << "Cannot proceed with advanced tests - venue creation failed" << std::endl;
         return;
     }
     
-    // Update name and address
-    int id1 = testVenues[0]->id;
-    std::cout << "1. Updating name and address for ID " << id1 << ":" << std::endl;
-    std::cout << "Before update:" << std::endl;
-    displayVenue(module.getVenueById(id1));
+    int venueId = advancedVenue->id;
     
-    if (module.updateVenue(id1, "Updated Grand Concert Hall", "456 Updated Street")) {
-        std::cout << "\nAfter update:" << std::endl;
-        displayVenue(module.getVenueById(id1));
-    } else {
-        std::cout << "Update failed." << std::endl;
-    }
-    displaySeparator();
+    // Initialize and create seating
+    VenueManager::initializeVenueSeatingPlan(venueId, 8, 12);
+    VenueManager::createStandardSeatingPlan(venueId, 8, 12, "Regular");
     
-    // Update capacity and contact info
-    if (testVenues.size() > 1) {
-        int id2 = testVenues[1]->id;
-        std::cout << "2. Updating capacity and contact info for ID " << id2 << ":" << std::endl;
-        std::cout << "Before update:" << std::endl;
-        displayVenue(module.getVenueById(id2));
-        
-        if (module.updateVenue(
-            id2, 
-            "",    // No name change
-            "",    // No address change
-            "",    // No city change
-            "",    // No state change
-            "",    // No zip change
-            "",    // No country change
-            10000, // New capacity
-            "",    // No description change
-            "newemail@example.com"  // New contact
-        )) {
-            std::cout << "\nAfter update:" << std::endl;
-            displayVenue(module.getVenueById(id2));
-        } else {
-            std::cout << "Update failed." << std::endl;
-        }
-        displaySeparator();
-    }
+    // Test 1: Find adjacent seats for group booking
+    auto adjacentGroups = VenueManager::findAdjacentSeats(venueId, 4);
+    displayTestResult("Find adjacent seats (groups of 4)", !adjacentGroups.empty(), 
+        "Found " + std::to_string(adjacentGroups.size()) + " possible groups");
     
-    // Update seat status
-    if (!testVenues.empty() && !module.getSeatsForVenue(testVenues[0]->id).empty()) {
-        int venueId = testVenues[0]->id;
-        auto seats = module.getSeatsForVenue(venueId);
-        int seatId = seats[0]->seat_id; // Get first seat ID
+    // Test 2: Reserve a block of seats
+    bool reserveSuccess = false;
+    if (!adjacentGroups.empty()) {
+        reserveSuccess = VenueManager::reserveSeatBlock(venueId, adjacentGroups[0]);
+        displayTestResult("Reserve seat block", reserveSuccess, "Reserved 4 adjacent seats");
         
-        std::cout << "3. Updating seat status for venue " << venueId << ", seat " << seatId << ":" << std::endl;
-        std::cout << "Before update:" << std::endl;
-        displaySeatList({seats[0]});
-        
-        if (module.updateSeatStatus(venueId, seatId, Model::TicketStatus::SOLD)) {
-            std::cout << "\nAfter update:" << std::endl;
-            auto updatedSeats = module.getSeatsForVenue(venueId);
-            
-            // Find the updated seat
-            for (const auto& seat : updatedSeats) {
-                if (seat->seat_id == seatId) {
-                    displaySeatList({seat});
-                    break;
-                }
+        if (reserveSuccess) {
+            std::cout << "Reserved seats: ";
+            for (const auto& seat : adjacentGroups[0]) {
+                std::cout << seat->row_number << seat->col_number << " ";
             }
-        } else {
-            std::cout << "Update failed." << std::endl;
+            std::cout << std::endl;
         }
-        displaySeparator();
     }
     
-    // Test updating non-existent venue
-    std::cout << "4. Attempting to update non-existent venue (ID 9999):" << std::endl;
-    bool nonExistentUpdate = module.updateVenue(9999, "This Should Fail");
-    std::cout << "Update result: " << (nonExistentUpdate ? "Succeeded (unexpected)" : "Failed (expected)") << std::endl;
+    // Test 3: Update seat status manually
+    auto testSeat = VenueManager::getSeatAt(venueId, 2, 5); // Row C, Seat 6
+    bool statusUpdateSuccess = false;
+    if (testSeat) {
+        statusUpdateSuccess = VenueManager::updateSeatStatus(venueId, testSeat->seat_id, Model::TicketStatus::CHECKED_IN);
+        displayTestResult("Update individual seat status", statusUpdateSuccess, 
+            "Set " + testSeat->row_number + testSeat->col_number + " to CHECKED_IN");
+    }
+    
+    // Test 4: Add individual seat
+    auto newSeat = VenueManager::addSeat(venueId, "VIP", "Z", "99");
+    displayTestResult("Add individual seat", newSeat != nullptr, "Added VIP seat Z99");
+    
+    // Test 5: Remove a seat
+    bool removeSuccess = false;
+    if (newSeat) {
+        removeSuccess = VenueManager::removeSeat(venueId, newSeat->seat_id);
+        displayTestResult("Remove seat", removeSuccess, "Removed seat Z99");
+    }
+    
+    // Test 6: Find adjacent seats after reservations
+    auto adjacentAfterReservation = VenueManager::findAdjacentSeats(venueId, 4);
+    displayTestResult("Find adjacent seats after reservations", 
+        adjacentAfterReservation.size() < adjacentGroups.size(),
+        "Found " + std::to_string(adjacentAfterReservation.size()) + " groups (reduced from " + 
+        std::to_string(adjacentGroups.size()) + ")");
+    
+    // Display updated statistics
+    std::string updatedStats = VenueManager::getVenueSeatingStats(venueId);
+    std::cout << "\nUpdated Venue Statistics:\n" << updatedStats << std::endl;
 }
 
-// Test seat management operations
-void testSeatOperations(VenueModule& module, const std::vector<std::shared_ptr<Model::Venue>>& testVenues) {
-    displayHeader("SEAT MANAGEMENT TEST");
+// Test seating plan visualization
+void testSeatingPlanVisualization() {
+    displayHeader("Testing Seating Plan Visualization");
     
-    if (testVenues.empty() || testVenues.size() < 2) {
-        std::cout << "Not enough test venues available for seat management testing." << std::endl;
+    // Create a smaller venue for easier visualization testing
+    auto vizVenue = VenueManager::createVenue(
+        "Visualization Test Theater",
+        "789 Viz Street",
+        "Test City",
+        "TS",
+        "12347",
+        "USA",
+        35,
+        "Small theater for visualization testing"
+    );
+    
+    if (!vizVenue) {
+        std::cout << "Cannot proceed with visualization tests - venue creation failed" << std::endl;
         return;
     }
     
-    int venueId = testVenues[1]->id;
-    std::cout << "1. Adding individual seats to venue ID " << venueId << ":" << std::endl;
+    int venueId = vizVenue->id;
     
-    // Add a few individual seats
-    module.addSeat(venueId, "Premium", "AA", "1");
-    module.addSeat(venueId, "Premium", "AA", "2");
-    module.addSeat(venueId, "Premium", "AA", "3");
-    module.addSeat(venueId, "Standard", "BB", "1");
-    module.addSeat(venueId, "Standard", "BB", "2");
+    // Test 1: Visualization without initialization
+    std::string emptyViz = VenueManager::getSeatingPlanVisualization(venueId);
+    displayTestResult("Visualization without 2D initialization", 
+        emptyViz.find("not initialized") != std::string::npos);
     
-    // Display all seats
-    auto seats = module.getSeatsForVenue(venueId);
-    displaySeatList(seats);
-    displaySeparator();
+    // Test 2: Initialize and create small seating plan
+    VenueManager::initializeVenueSeatingPlan(venueId, 5, 7);
+    VenueManager::createStandardSeatingPlan(venueId, 5, 7, "Regular");
     
-    // Remove a seat
-    if (!seats.empty()) {
-        int seatToRemove = seats[0]->seat_id;
-        std::cout << "2. Removing seat ID " << seatToRemove << " from venue ID " << venueId << ":" << std::endl;
-        
-        if (module.removeSeat(venueId, seatToRemove)) {
-            std::cout << "Seat removed successfully." << std::endl;
-            
-            // Display remaining seats
-            auto remainingSeats = module.getSeatsForVenue(venueId);
-            std::cout << "\nRemaining seats:" << std::endl;
-            displaySeatList(remainingSeats);
-        } else {
-            std::cout << "Seat removal failed." << std::endl;
-        }
-        displaySeparator();
+    std::string initialViz = VenueManager::getSeatingPlanVisualization(venueId);
+    displayTestResult("Initial seating plan visualization", !initialViz.empty());
+    
+    std::cout << "\nInitial Seating Plan:\n" << initialViz << std::endl;
+    
+    // Test 3: Make some reservations and show updated visualization
+    auto groups = VenueManager::findAdjacentSeats(venueId, 3);
+    if (!groups.empty()) {
+        VenueManager::reserveSeatBlock(venueId, groups[0]);
     }
     
-    // Get available seats
-    std::cout << "3. Getting available seats for venue ID " << venueId << ":" << std::endl;
-    auto availableSeats = module.getAvailableSeats(venueId);
-    displaySeatList(availableSeats);
+    // Check in some seats
+    auto seatB2 = VenueManager::getSeatAt(venueId, 1, 1);
+    if (seatB2) {
+        VenueManager::updateSeatStatus(venueId, seatB2->seat_id, Model::TicketStatus::CHECKED_IN);
+    }
     
-    // Update some seats to be unavailable
-    if (!availableSeats.empty()) {
-        // Mark the first seat as sold
-        int seatId = availableSeats[0]->seat_id;
-        std::cout << "\n4. Marking seat ID " << seatId << " as SOLD:" << std::endl;
+    auto seatC4 = VenueManager::getSeatAt(venueId, 2, 3);
+    if (seatC4) {
+        VenueManager::updateSeatStatus(venueId, seatC4->seat_id, Model::TicketStatus::CANCELLED);
+    }
+    
+    std::string updatedViz = VenueManager::getSeatingPlanVisualization(venueId);
+    displayTestResult("Updated seating plan visualization", !updatedViz.empty());
+    
+    std::cout << "\nUpdated Seating Plan (after reservations):\n" << updatedViz << std::endl;
+    
+    // Test 4: Final statistics
+    std::string finalStats = VenueManager::getVenueSeatingStats(venueId);
+    std::cout << "Final Statistics:\n" << finalStats << std::endl;
+}
+
+// Test edge cases and error handling
+void testEdgeCases() {
+    displayHeader("Testing Edge Cases and Error Handling");
+    
+    // Test 1: Operations on non-existent venue
+    auto nonExistentSeat = VenueManager::getSeatAt(99999, 0, 0);
+    displayTestResult("Get seat from non-existent venue", nonExistentSeat == nullptr);
+    
+    bool nonExistentInit = VenueManager::initializeVenueSeatingPlan(99999, 5, 5);
+    displayTestResult("Initialize non-existent venue", !nonExistentInit);
+    
+    std::string nonExistentStats = VenueManager::getVenueSeatingStats(99999);
+    displayTestResult("Get stats for non-existent venue", 
+        nonExistentStats.find("not found") != std::string::npos);
+    
+    // Test 2: Invalid coordinates
+    auto testVenue = VenueManager::createVenue("Edge Test Venue", "123 Edge St", "Test", "TS", "12348", "USA", 25);
+    if (testVenue) {
+        VenueManager::initializeVenueSeatingPlan(testVenue->id, 3, 5);
+        VenueManager::createStandardSeatingPlan(testVenue->id, 3, 5);
         
-        if (module.updateSeatStatus(venueId, seatId, Model::TicketStatus::SOLD)) {
-            std::cout << "Status updated successfully." << std::endl;
-            
-            // Check available seats again
-            std::cout << "\nAvailable seats after update:" << std::endl;
-            auto newAvailableSeats = module.getAvailableSeats(venueId);
-            displaySeatList(newAvailableSeats);
-            
-            // Verify we have one less available seat
-            std::cout << "Original available seat count: " << availableSeats.size() << std::endl;
-            std::cout << "New available seat count: " << newAvailableSeats.size() << std::endl;
-        } else {
-            std::cout << "Status update failed." << std::endl;
-        }
+        auto invalidSeat = VenueManager::getSeatAt(testVenue->id, 10, 10);
+        displayTestResult("Get seat with invalid coordinates", invalidSeat == nullptr);
+        
+        auto invalidRow = VenueManager::getSeatsInRow(testVenue->id, 10);
+        displayTestResult("Get seats from invalid row", invalidRow.empty());
+    }
+    
+    // Test 3: Adjacent seats with invalid parameters
+    if (testVenue) {
+        auto invalidAdjacent = VenueManager::findAdjacentSeats(testVenue->id, 0);
+        displayTestResult("Find adjacent seats with invalid count", invalidAdjacent.empty());
+        
+        auto tooManyAdjacent = VenueManager::findAdjacentSeats(testVenue->id, 20);
+        displayTestResult("Find more adjacent seats than available", tooManyAdjacent.empty());
+    }
+    
+    // Test 4: Reserve empty seat block
+    std::vector<std::shared_ptr<Model::Seat>> emptyBlock;
+    bool emptyReserve = VenueManager::reserveSeatBlock(testVenue ? testVenue->id : 1, emptyBlock);
+    displayTestResult("Reserve empty seat block", !emptyReserve);
+}
+
+// Test cleanup and deletion
+void testCleanup() {
+    displayHeader("Testing Cleanup and Deletion");
+    
+    // Create a venue for deletion testing
+    auto deleteVenue = VenueManager::createVenue(
+        "Venue To Delete",
+        "Delete Street",
+        "Delete City",
+        "DL",
+        "00000",
+        "USA",
+        50
+    );
+    
+    bool venueCreated = deleteVenue != nullptr;
+    displayTestResult("Create venue for deletion", venueCreated);
+    
+    if (deleteVenue) {
+        int venueId = deleteVenue->id;
+        
+        // Add some seats
+        VenueManager::initializeVenueSeatingPlan(venueId, 2, 5);
+        VenueManager::createStandardSeatingPlan(venueId, 2, 5);
+        
+        // Verify venue exists and has seats
+        auto beforeDelete = VenueManager::getVenueById(venueId);
+        bool hasSeatsBeforeDelete = beforeDelete && !beforeDelete->seats.empty();
+        displayTestResult("Venue has seats before deletion", hasSeatsBeforeDelete);
+        
+        // Delete the venue
+        bool deleteSuccess = VenueManager::deleteVenue(venueId);
+        displayTestResult("Delete venue", deleteSuccess);
+        
+        // Verify venue is gone
+        auto afterDelete = VenueManager::getVenueById(venueId);
+        displayTestResult("Venue no longer exists after deletion", afterDelete == nullptr);
     }
 }
 
-// Test DELETE operations
-void testDeleteOperations(VenueModule& module, std::vector<std::shared_ptr<Model::Venue>>& testVenues) {
-    displayHeader("DELETE OPERATIONS TEST");
-    
-    if (testVenues.empty()) {
-        std::cout << "No test venues available for delete testing." << std::endl;
-        return;
-    }
-    
-    // Delete the last created venue
-    int idToDelete = testVenues.back()->id;
-    std::cout << "1. Deleting venue with ID " << idToDelete << ":" << std::endl;
-    displayVenue(module.getVenueById(idToDelete));
-    
-    if (module.deleteVenue(idToDelete)) {
-        std::cout << "\nVenue successfully deleted." << std::endl;
-        
-        // Verify deletion
-        auto verifyDelete = module.getVenueById(idToDelete);
-        if (!verifyDelete) {
-            std::cout << "Verification successful: Venue no longer exists." << std::endl;
-        } else {
-            std::cout << "Verification failed: Venue still exists!" << std::endl;
-        }
-        
-        // Remove from our test list
-        testVenues.pop_back();
-    } else {
-        std::cout << "Deletion failed." << std::endl;
-    }
-    displaySeparator();
-    
-    // Show remaining venues
-    std::cout << "2. Remaining venues after deletion:" << std::endl;
-    displayVenueList(module.getAllVenues());
-    
-    // Try to delete non-existent venue
-    std::cout << "\n3. Attempting to delete non-existent venue (ID 9999):" << std::endl;
-    bool nonExistentDelete = module.deleteVenue(9999);
-    std::cout << "Delete result: " << (nonExistentDelete ? "Succeeded (unexpected)" : "Failed (expected)") << std::endl;
-}
-
-// Main testing function
+// Main test function
 int main() {
-    std::cout << "\n\n";
-    displayHeader("VENUE MODULE COMPREHENSIVE TEST");
-    std::cout << "Date: " << Model::DateTime::now().iso8601String << "\n\n";
-    
-    // Create module instance
-    VenueModule module;
-    
-    // Vector to keep track of created venues for testing
-    std::vector<std::shared_ptr<Model::Venue>> testVenues;
+    std::cout << "==================================================================" << std::endl;
+    std::cout << "           COMPREHENSIVE VENUE MODULE TEST SUITE" << std::endl;
+    std::cout << "                 Testing 2D Array Functionality" << std::endl;
+    std::cout << "==================================================================" << std::endl;
+    std::cout << std::endl;
     
     try {
-        // Test CREATE operations
-        testVenues = testCreateOperation(module);
-        std::cout << "\n\n";
+        // Run all test suites
+        testBasicVenueCRUD();
+        test2DSeatingPlan();
+        testAdvanced2DOperations();
+        testSeatingPlanVisualization();
+        testEdgeCases();
+        testCleanup();
         
-        // Test adding seats to venues
-        testAddSeats(module, testVenues);
-        std::cout << "\n\n";
+        // Display final results
+        displayHeader("Test Results Summary");
+        std::cout << "Tests Passed: " << testsPassed << std::endl;
+        std::cout << "Tests Failed: " << testsFailed << std::endl;
+        std::cout << "Total Tests:  " << (testsPassed + testsFailed) << std::endl;
+        std::cout << "Success Rate: " << std::fixed << std::setprecision(1) 
+                  << (testsPassed * 100.0 / (testsPassed + testsFailed)) << "%" << std::endl;
         
-        // Test READ operations
-        testReadOperations(module, testVenues);
-        std::cout << "\n\n";
+        if (testsFailed == 0) {
+            std::cout << "\n🎉 ALL TESTS PASSED! The VenueModule 2D functionality is working correctly." << std::endl;
+        } else {
+            std::cout << "\n⚠️  SOME TESTS FAILED. Please review the failed tests above." << std::endl;
+        }
         
-        // Test UPDATE operations
-        testUpdateOperations(module, testVenues);
-        std::cout << "\n\n";
+        displaySeparator('=');
         
-        // Test seat management operations
-        testSeatOperations(module, testVenues);
-        std::cout << "\n\n";
-        
-        // Test DELETE operations
-        testDeleteOperations(module, testVenues);
-        
-        displayHeader("TEST COMPLETED SUCCESSFULLY");
-    }
-    catch (const std::exception& e) {
-        std::cerr << "\n\nERROR: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "\nFATAL ERROR during testing: " << e.what() << std::endl;
         return 1;
     }
     
-    return 0;
+    return (testsFailed == 0) ? 0 : 1;
 }
