@@ -560,6 +560,11 @@ public:
             return false;
         }
         
+        // Check if seats vector is empty
+        if (seats.empty()) {
+            return false; // Cannot reserve an empty block of seats
+        }
+        
         // First check if all seats are available
         for (const auto& seat : seats) {
             if (!seat || seat->status != Model::TicketStatus::AVAILABLE) {
