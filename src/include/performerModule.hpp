@@ -41,9 +41,9 @@ public:
      * @brief Create a new performer
      * 
      * @param name Performer name
-     * @param type Performer type (e.g., "Solo Artist", "Band", "DJ")
+     * @param type Performer type (e.g., "Solo Artist", "Band", "DJ", etc.)
      * @param contactInfo Contact information
-     * @param bio Biography of the performer
+     * @param bio Biography/description
      * @param imageUrl URL to performer's image (optional)
      * @return std::shared_ptr<Model::Performer> Pointer to created performer
      */
@@ -115,7 +115,7 @@ public:
 
     /**
      * @brief Find performers by type (case insensitive)
-     * @param typeQuery Type to search for (e.g., "Band", "Solo Artist")
+     * @param typeQuery Type to search for (e.g., "Band", "Solo Artist", "DJ")
      * @return std::vector<std::shared_ptr<Model::Performer>> Vector of matching performers
      */
     std::vector<std::shared_ptr<Model::Performer>> findPerformersByType(const std::string& typeQuery) {
@@ -254,14 +254,20 @@ protected:
     }
 };
 
-// Namespace wrapper for simplified access
+/**
+ * @brief Namespace wrapper for PerformerModule providing static functions
+ * 
+ * This provides the dual-layer API pattern used throughout the system.
+ * Functions wrap a singleton instance of PerformerModule.
+ */
 namespace PerformerManager {
-    // Static instance for singleton pattern
+    
+    // Singleton instance
     static PerformerModule& getInstance() {
         static PerformerModule instance;
         return instance;
     }
-
+    
     /**
      * @brief Create a new performer
      */
@@ -274,47 +280,47 @@ namespace PerformerManager {
     ) {
         return getInstance().createPerformer(name, type, contactInfo, bio, imageUrl);
     }
-
+    
     /**
      * @brief Get a performer by ID
      */
     inline std::shared_ptr<Model::Performer> getPerformerById(int id) {
         return getInstance().getPerformerById(id);
     }
-
+    
     /**
      * @brief Get all performers
      */
     inline const std::vector<std::shared_ptr<Model::Performer>>& getAllPerformers() {
         return getInstance().getAllPerformers();
     }
-
+    
     /**
      * @brief Find performers by name
      */
     inline std::vector<std::shared_ptr<Model::Performer>> findPerformersByName(const std::string& nameQuery) {
         return getInstance().findPerformersByName(nameQuery);
     }
-
+    
     /**
      * @brief Find performers by type
      */
     inline std::vector<std::shared_ptr<Model::Performer>> findPerformersByType(const std::string& typeQuery) {
         return getInstance().findPerformersByType(typeQuery);
     }
-
+    
     /**
      * @brief Update a performer
      */
     inline bool updatePerformer(int id, 
-                                const std::string& name = "", 
-                                const std::string& type = "", 
-                                const std::string& contactInfo = "",
-                                const std::string& bio = "",
-                                const std::string& imageUrl = "") {
+                               const std::string& name = "", 
+                               const std::string& type = "", 
+                               const std::string& contactInfo = "",
+                               const std::string& bio = "",
+                               const std::string& imageUrl = "") {
         return getInstance().updatePerformer(id, name, type, contactInfo, bio, imageUrl);
     }
-
+    
     /**
      * @brief Delete a performer
      */
