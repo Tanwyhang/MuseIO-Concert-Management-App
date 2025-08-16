@@ -7,7 +7,6 @@
 | **AuthModule** | Handles secure authentication and authorization with direct memory access for enhanced security. |
 | **VenueModule** | Manages concert venues with capabilities for seat assignment and seating plan visualization. |
 | **ReportModule** | Generates analytics and reports for concerts including operational indicators and feedback analysis. |
-| **SponsorModule** | Manages sponsor profiles and their relationships with promotions and events. |
 | **ConcertModule** | Handles creation and management of concert events including scheduling and status tracking. |
 | **CrewModule** | Manages staff information with task assignment and attendance tracking capabilities. |
 | **PaymentModule** | Processes transactions and tracks payment status for tickets and other financial operations. |

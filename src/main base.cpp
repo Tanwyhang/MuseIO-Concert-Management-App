@@ -12,7 +12,6 @@
 #include "include/feedbackModule.hpp"
 #include "include/performerModule.hpp"
 #include "include/reportModule.hpp"
-#include "include/sponsorModule.hpp"
 #include "include/attendeeModule.hpp"
 #include "include/uiModule.hpp"
 

@@ -92,12 +92,6 @@ erDiagram
         string bio  
         string image_url  
     }
-    Sponsor {
-        string sponsor_id PK  
-        string name  
-        string contact  
-        string email  
-    }
     Ticket {
         int ticket_id PK  
         string status  
@@ -121,7 +115,6 @@ erDiagram
     Promotion {
         string code  
         string description  
-        SponsorArray sponsors  
         string discount_type  
         double percentage  
         string start_date_time  
@@ -157,4 +150,3 @@ erDiagram
     Venue||--o{Seat:"contains"
     concertTicket||--o{Ticket:"generates"
     Ticket||--||Payment:"has"
-    Sponsor||--o{Promotion:"sponsors"

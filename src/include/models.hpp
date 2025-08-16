@@ -15,7 +15,6 @@ namespace Model {
     struct Task;
     struct Crew;
     struct Feedback;
-    struct Sponsor;
     struct Promotion;
     struct Payment;
     struct Performer;
@@ -223,19 +222,10 @@ namespace Model {
         std::weak_ptr<Attendee> attendee; // To avoid circular references
     };
 
-    // Sponsor struct for event sponsors
-    struct Sponsor {
-        std::string sponsor_id;
-        std::string name;
-        std::string contact;
-        std::string email;
-    };
-
     // Promotion struct for discounts and special offers
     struct Promotion {
         std::string code;
         std::string description;
-        std::vector<std::shared_ptr<Sponsor>> sponsors;
         DiscountType discount_type;
         double percentage;           // For PERCENTAGE type
         DateTime start_date_time;
