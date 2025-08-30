@@ -25,7 +25,7 @@ public:
      * @brief Constructor
      * Initializes the module and loads existing attendees
      */
-    AttendeeModule() : BaseModule<Model::Attendee>("../../data/attendees.dat") {
+    AttendeeModule() : BaseModule<Model::Attendee>("data/attendees.dat") {
         loadEntities();
     }
     

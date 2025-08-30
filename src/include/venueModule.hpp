@@ -25,7 +25,7 @@ public:
      * @brief Constructor
      * Initializes the module and loads existing venues
      */
-    VenueModule() : BaseModule<Model::Venue>("../../data/venues.dat") {
+    VenueModule() : BaseModule<Model::Venue>("data/venues.dat") {
         loadEntities();
     }
 

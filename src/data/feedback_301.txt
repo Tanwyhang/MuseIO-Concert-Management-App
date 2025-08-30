@@ -1,0 +1,25 @@
+Rating: 5
+Comments: Absolutely incredible! Amazing sound system and fantastic performance. Best concert ever!
+Sentiment: 0
+Escalation: NO
+---
+Rating: 5
+Comments: The lead guitarist was outstanding! Excellent venue and great atmosphere.
+Sentiment: 0
+Escalation: NO
+---
+Rating: 4
+Comments: Great performance overall. Sound was initially too loud but staff quickly adjusted it.
+Sentiment: 0
+Escalation: NO
+---
+Rating: 3
+Comments: Good concert but overpriced tickets. Sound quality was decent.
+Sentiment: 1
+Escalation: NO
+---
+Rating: 2
+Comments: Poor facilities management. Restrooms were dirty and overcrowded.
+Sentiment: 2
+Escalation: NO
+---

@@ -1,0 +1,10 @@
+Rating: 5
+Comments: Excellent sound and lovely ambience!
+Sentiment: 0
+Escalation: NO
+---
+Rating: 4
+Comments: Great performance by The Harmonics.
+Sentiment: 0
+Escalation: NO
+---

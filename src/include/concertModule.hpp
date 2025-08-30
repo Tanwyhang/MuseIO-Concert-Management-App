@@ -24,7 +24,7 @@ public:
      * @brief Constructor
      * Initializes the module and loads existing concerts
      */
-    ConcertModule() : BaseModule<Model::Concert>("../../data/concerts.dat") {
+    ConcertModule() : BaseModule<Model::Concert>("data/concerts.dat") {
         loadEntities();
     }
 

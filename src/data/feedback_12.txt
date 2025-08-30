@@ -1,0 +1,50 @@
+Rating: 5
+Comments: Absolutely incredible performance! The acoustics were perfect and the musicians were phenomenal!
+Sentiment: 0
+Escalation: NO
+---
+Rating: 4
+Comments: Great sound quality, though it was a bit loud at times.
+Sentiment: 0
+Escalation: NO
+---
+Rating: 2
+Comments: Venue was overcrowded and hard to find parking. Not a great experience.
+Sentiment: 2
+Escalation: NO
+---
+Rating: 1
+Comments: Terrible organization, worst entry management I've seen. Unsafe crowd control felt dangerous.
+Sentiment: 3
+Escalation: YES
+---
+Rating: 1
+Comments: Security issue: witnessed theft and no response. This is unsafe and unacceptable!
+Sentiment: 3
+Escalation: YES
+---
+Rating: 3
+Comments: Sound was fine but emergency exit signs were blocked. Could be a safety hazard.
+Sentiment: 3
+Escalation: YES
+---
+Rating: 1
+Comments: Medical emergency near section B and staff were slow. Needs escalation.
+Sentiment: 3
+Escalation: YES
+---
+Rating: 2
+Comments: Overpriced food and terrible queue system. Disappointing and poor value.
+Sentiment: 2
+Escalation: NO
+---
+Rating: 1
+Comments: Fire hazard: pyrotechnics too close to audience. Extremely dangerous.
+Sentiment: 3
+Escalation: YES
+---
+Rating: 2
+Comments: Horrible seating layout, obstructed view and no staff assistance.
+Sentiment: 2
+Escalation: NO
+---

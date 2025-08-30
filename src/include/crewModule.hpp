@@ -30,7 +30,7 @@ public:
      * @brief Constructor
      * Initializes the module and loads existing crew members
      */
-    CrewModule() : BaseModule<Model::Crew>("../../data/crews.dat") {
+    CrewModule() : BaseModule<Model::Crew>("data/crews.dat") {
         loadEntities();
     }
     

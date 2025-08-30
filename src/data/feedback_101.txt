@@ -1,0 +1,15 @@
+Rating: 5
+Comments: Absolutely amazing concert! The sound was excellent and the performers were fantastic!
+Sentiment: 0
+Escalation: NO
+---
+Rating: 2
+Comments: Terrible experience. The sound was awful and overpriced tickets.
+Sentiment: 2
+Escalation: NO
+---
+Rating: 1
+Comments: Unsafe conditions! There was a dangerous crowd surge and no security response.
+Sentiment: 3
+Escalation: YES
+---

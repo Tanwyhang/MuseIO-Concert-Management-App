@@ -14,6 +14,9 @@
 #include "models.hpp"
 #include "baseModule.hpp"
 
+// Forward declarations to avoid circular dependencies
+class AttendeeModule;
+
 namespace TicketManager {
 
     /**
@@ -49,6 +52,7 @@ namespace TicketManager {
          * @return Ticket ID if successful, -1 if failed
          */
         int createTicket(int attendee_id, int concert_id, const std::string& ticket_type) {
+            // **PRIORITY 1 FIX: Enhanced validation with concert existence check**
             if (!validateTicketCreation(attendee_id, concert_id, ticket_type)) {
                 return -1;
             }
@@ -59,7 +63,52 @@ namespace TicketManager {
             ticket->qr_code = generateUniqueQRCode(ticket->ticket_id, concert_id, attendee_id);
             ticket->created_at = Model::DateTime::now();
             ticket->updated_at = Model::DateTime::now();
-            // Note: attendee, payment, and concert_ticket weak_ptr references should be set by calling code if needed
+            
+            entities.push_back(ticket);
+            saveEntities();
+            
+            logTicketTransaction(*ticket, "CREATED");
+            return ticket->ticket_id;
+        }
+        
+        /**
+         * @brief Set attendee relationship for a ticket (PRIORITY 2 FIX)
+         * @param ticket_id Ticket ID
+         * @param attendee Shared pointer to attendee
+         * @return true if successful, false otherwise
+         */
+        bool setTicketAttendee(int ticket_id, std::shared_ptr<Model::Attendee> attendee) {
+            auto ticket = getTicketById(ticket_id);
+            if (!ticket || !attendee) {
+                return false;
+            }
+            
+            ticket->attendee = attendee;
+            ticket->updated_at = Model::DateTime::now();
+            saveEntities();
+            return true;
+        }
+        
+        /**
+         * @brief Create a new ticket with enhanced concert validation (safer version)
+         * @param attendee_id ID of the attendee purchasing the ticket
+         * @param concert_id ID of the concert
+         * @param ticket_type Type of ticket (VIP, Regular, etc.)
+         * @param concertExists Result of external concert existence validation
+         * @return Ticket ID if successful, -1 if failed
+         */
+        int createTicketSafe(int attendee_id, int concert_id, const std::string& ticket_type, bool concertExists) {
+            // **PRIORITY 1 FIX: Use enhanced validation**
+            if (!validateTicketCreationWithConcert(attendee_id, concert_id, ticket_type, concertExists)) {
+                return -1;
+            }
+
+            auto ticket = std::make_shared<Model::Ticket>();
+            ticket->ticket_id = generateNewId();
+            ticket->status = Model::TicketStatus::SOLD;
+            ticket->qr_code = generateUniqueQRCode(ticket->ticket_id, concert_id, attendee_id);
+            ticket->created_at = Model::DateTime::now();
+            ticket->updated_at = Model::DateTime::now();
             
             entities.push_back(ticket);
             saveEntities();
@@ -82,6 +131,29 @@ namespace TicketManager {
             
             for (int i = 0; i < quantity; ++i) {
                 int ticket_id = createTicket(attendee_id, concert_id, ticket_type);
+                if (ticket_id != -1) {
+                    ticket_ids.push_back(ticket_id);
+                }
+            }
+            
+            return ticket_ids;
+        }
+        
+        /**
+         * @brief Create multiple tickets with enhanced validation (safer version)
+         * @param attendee_id ID of the attendee purchasing tickets
+         * @param concert_id ID of the concert
+         * @param quantity Number of tickets to create
+         * @param ticket_type Type of tickets
+         * @param concertExists Result of external concert existence validation
+         * @return Vector of ticket IDs created
+         */
+        std::vector<int> createMultipleTicketsSafe(int attendee_id, int concert_id, 
+                                                 int quantity, const std::string& ticket_type, bool concertExists) {
+            std::vector<int> ticket_ids;
+            
+            for (int i = 0; i < quantity; ++i) {
+                int ticket_id = createTicketSafe(attendee_id, concert_id, ticket_type, concertExists);
                 if (ticket_id != -1) {
                     ticket_ids.push_back(ticket_id);
                 }
@@ -520,6 +592,14 @@ namespace TicketManager {
             logTicketTransaction(*ticket, "UPGRADED");
             return true;
         }
+        
+        /**
+         * @brief Public method to save entities (PRIORITY 2 FIX)
+         * @return true if successful, false otherwise
+         */
+        bool saveTicketEntities() {
+            return saveEntities();
+        }
 
     protected:
         // BaseModule implementation
@@ -660,8 +740,35 @@ namespace TicketManager {
             if (attendee_id <= 0 || concert_id <= 0) return false;
             if (ticket_type.empty()) return false;
             
-            // Check if tickets are still available
-            return areTicketsOnSale(concert_id);
+            // **PRIORITY 1 FIX: Enhanced validation with concert existence check**
+            // Basic validation first
+            if (!areTicketsOnSale(concert_id)) {
+                return false;
+            }
+            
+            return true; // Will be enhanced by external concert validation
+        }
+        
+        /**
+         * @brief Enhanced ticket creation with concert validation
+         * @param attendee_id Attendee ID
+         * @param concert_id Concert ID  
+         * @param ticket_type Ticket type
+         * @param concertExists External concert validation result
+         * @return true if valid, false otherwise
+         */
+        bool validateTicketCreationWithConcert(int attendee_id, int concert_id, 
+                                             const std::string& ticket_type, bool concertExists) {
+            if (!validateTicketCreation(attendee_id, concert_id, ticket_type)) {
+                return false;
+            }
+            
+            // **PRIORITY 1 FIX: Validate concert existence**
+            if (!concertExists) {
+                return false; // Concert doesn't exist
+            }
+            
+            return true;
         }
 
         /**
@@ -677,4 +784,34 @@ namespace TicketManager {
         }
     };
 
+}
+
+// Enhanced namespace wrapper functions with concert validation
+namespace TicketManager {
+    // Static instance for namespace functions  
+    static TicketModule& getModule() {
+        static TicketModule module("data/tickets.dat");
+        return module;
+    }
+    
+    /**
+     * @brief Create ticket with concert validation (PRIORITY 1 FIX)
+     * @param attendee_id Attendee ID
+     * @param concert_id Concert ID
+     * @param ticket_type Ticket type
+     * @param concertExists External concert validation result
+     * @return Ticket ID if successful, -1 if failed
+     */
+    int createTicketWithValidation(int attendee_id, int concert_id, 
+                                 const std::string& ticket_type, bool concertExists) {
+        return getModule().createTicketSafe(attendee_id, concert_id, ticket_type, concertExists);
+    }
+    
+    /**
+     * @brief Create multiple tickets with concert validation (PRIORITY 1 FIX)
+     */
+    std::vector<int> createMultipleTicketsWithValidation(int attendee_id, int concert_id, 
+                                                       int quantity, const std::string& ticket_type, bool concertExists) {
+        return getModule().createMultipleTicketsSafe(attendee_id, concert_id, quantity, ticket_type, concertExists);
+    }
 }

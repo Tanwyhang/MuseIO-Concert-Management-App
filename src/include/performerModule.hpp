@@ -25,7 +25,7 @@ public:
      * @brief Constructor
      * Initializes the module and loads existing performers
      */
-    PerformerModule() : BaseModule<Model::Performer>("../../data/performers.dat") {
+    PerformerModule() : BaseModule<Model::Performer>("data/performers.dat") {
         loadEntities();
     }
     

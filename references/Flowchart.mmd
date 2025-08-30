@@ -1,0 +1,108 @@
+---
+config:
+  layout: elk
+  theme: redux
+---
+flowchart TD
+ subgraph subGraph0["Management Portal"]
+        B1["Admin Login"]
+        B["Management Portal"]
+        B2["Management Dashboard"]
+        B21["Concert Management"]
+        B23["Payment Monitoring"]
+        B24["Analytics & Reports"]
+        B25["Enter User Portal"]
+        B27["Logout"]
+        n5["Create concert"]
+        n6["Edit Concert"]
+        n7["Delete Concert"]
+        n8["Enter ticket info"]
+        n9["Enter venue info"]
+        n11["<b>Enter concert info</b> including start end date time, capacity, venue, sponsorships etc, follow general standards"]
+        n12["One confirmation at the end, allow user to re-enter (go back) on each step for edits"]
+        n13["Selection of concerts created"]
+        n14["Show all payments for concert selected"]
+        n15["Show recent 30 payments received as quick overview"]
+        n16["Sign in / Sign Up"]
+        n26["View all payment, generate payroll for reporting"]
+        n27["Generate payroll"]
+        n28["Show summary metrics, overall data should be visualised"]
+        n29["Show metrics for each concert created"]
+        n30["Generate a Sales and Analytic Report"]
+        n31["enter password to continue"]
+        n32["Display all fields of the concert, the use switch case let the user edit the specific field"]
+  end
+ subgraph subGraph1["User Portal"]
+        C1["User Login/Register"]
+        C["User Portal"]
+        C2["User Dashboard"]
+        C21["Browse Concerts page"]
+        C22["Buy Tickets"]
+        C23["My Tickets"]
+        C24["Feedback page"]
+        C25["Logout"]
+        C211["Show recommendation (equivalent to sort by ticket sales) on-enter page"]
+        C212["Search mode"]
+        C221["Select Concert"]
+        C222["Choose Tickets"]
+        C223["Apply Promotions"]
+        C224["Payment Gateway"]
+        C225["Confirmation"]
+        n1["Select Past Concerts (This month)"]
+        n2["Enter concert ID"]
+        n4["Show active and expired tickets"]
+        n17["By name"]
+        n18["By date"]
+        n19["Sort by popularity (ticket sales)"]
+        n20["Key-in the concert ID to view concert details"]
+        n21["Active tickets will have QR code attached under"]
+        n22["Enter feedback paragraph"]
+        n23["One confirmation at the end of operation, allow user to re-enter (go back) on each step for edits"]
+        n24["Confirm logout"]
+        n25["Redirect to Management Portal"]
+  end
+    A["Main Menu"] --> B & D["Exit System"]
+    B --> B1
+    B1 --> B2
+    B2 --> B21 & B23 & B24 & B25 & B27
+    C --> C1
+    C1 --> C2
+    C2 --> C21 & C22 & C23 & C24 & C25
+    C21 --> C211 & C212
+    C22 --> C221
+    C221 --> C222
+    C222 --> C223
+    C223 --> C224
+    C224 --> C225
+    C24 --> n1
+    n1 --> n2
+    C23 --> n4
+    B21 --> n5 & n6 & n7
+    n5 --> n9 & n11 & n8
+    n8 --> n12
+    n9 --> n12
+    n11 --> n12
+    n7 --> n12
+    B23 --> n31
+    n13 --> n14
+    B25 --> n16
+    C212 --> n17 & n18 & n19
+    n19 --> n20
+    n17 --> n20
+    n18 --> n20
+    C211 --> n20
+    n4 --> n21
+    n2 --> n22
+    n22 --> n23
+    n20 --> n23
+    C225 --> n23
+    C25 --> n24
+    n24 --> n25
+    n14 --> n27
+    B24 --> n28 & n29 & n30
+    B27 --> n12
+    n31 --> n13 & n15 & n26
+    n6 --> n32
+    n32 --> n12
+    n25 --> B
+    n16 --> C
