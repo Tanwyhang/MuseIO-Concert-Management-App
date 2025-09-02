@@ -785,7 +785,7 @@ bool cancelScheduledReport(const std::string& schedule_id)
 
 **File**: `ticketModule.hpp`  
 **Namespace**: `TicketManager`  
-**Inherits from**: `BaseModule<Model::Ticket, int>`  
+**Inherits from**: `BaseModule<Modqel::Ticket, int>`  
 **Integration Status**: ✅ Enhanced with validation and user association fixes
 
 ### Context & Features
