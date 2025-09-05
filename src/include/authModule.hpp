@@ -436,6 +436,57 @@ public:
     }
 
     /**
+     * @brief Get all admin users (for demo/testing purposes)
+     * @return Vector of pairs containing username and user type for admin users
+     */
+    std::vector<std::pair<std::string, int>> getAdminUsers() {
+        std::vector<std::pair<std::string, int>> adminUsers;
+        
+        for (const auto& entry : credentialMap) {
+            int userType = getUserType(entry.first);
+            if (userType == 1) { // Admin user type
+                adminUsers.emplace_back(entry.first, userType);
+            }
+        }
+        
+        return adminUsers;
+    }
+
+    /**
+     * @brief Get all staff users (for demo/testing purposes)
+     * @return Vector of pairs containing username and user type for staff users
+     */
+    std::vector<std::pair<std::string, int>> getStaffUsers() {
+        std::vector<std::pair<std::string, int>> staffUsers;
+        
+        for (const auto& entry : credentialMap) {
+            int userType = getUserType(entry.first);
+            if (userType == 2) { // Staff user type
+                staffUsers.emplace_back(entry.first, userType);
+            }
+        }
+        
+        return staffUsers;
+    }
+
+    /**
+     * @brief Get all regular users (for demo/testing purposes)
+     * @return Vector of pairs containing username and user type for regular users
+     */
+    std::vector<std::pair<std::string, int>> getRegularUsers() {
+        std::vector<std::pair<std::string, int>> regularUsers;
+        
+        for (const auto& entry : credentialMap) {
+            int userType = getUserType(entry.first);
+            if (userType == 0) { // Regular user type
+                regularUsers.emplace_back(entry.first, userType);
+            }
+        }
+        
+        return regularUsers;
+    }
+
+    /**
      * @brief Save credentials to a file
      * @param filePath Path to save file
      * @return True if save successful
