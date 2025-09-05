@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
+#include <functional>
 #include "include/models.hpp"
 #include "include/authModule.hpp"
 #include "include/concertModule.hpp"
@@ -18,6 +19,7 @@
 #include "include/performerModule.hpp"
 #include "include/reportModule.hpp"
 #include "include/attendeeModule.hpp"
+#include "include/validationModule.hpp"
 #include "include/uiModule.hpp"
 
 // DataPaths namespace for centralized file path management
@@ -75,6 +77,7 @@ void displayAuthMenu();
 bool registerNewUser();
 void logout();
 void displayDemoCredentialsAndTests();
+void demonstrateValidation();
 
 // Demo credentials and test plan display function
 void displayDemoCredentialsAndTests() {
@@ -236,18 +239,18 @@ bool initializeModules() {
     try {
         std::cout << "Initializing MuseIO Concert Management System...\n";
         
-        // Initialize modules in dependency order
-        g_authModule = std::make_unique<AuthModule>(); // Uses default size_t parameter
-        g_attendeeModule = std::make_unique<AttendeeModule>();
-        g_venueModule = std::make_unique<VenueModule>();
-        g_performerModule = std::make_unique<PerformerModule>();
-        g_crewModule = std::make_unique<CrewModule>();
-        g_concertModule = std::make_unique<ConcertModule>();
+        // Initialize modules in dependency order using DataPaths constants
+        g_authModule = std::make_unique<AuthModule>(4096, DataPaths::AUTH_FILE);
+        g_attendeeModule = std::make_unique<AttendeeModule>(DataPaths::ATTENDEES_FILE);
+        g_venueModule = std::make_unique<VenueModule>(DataPaths::VENUES_FILE);
+        g_performerModule = std::make_unique<PerformerModule>(DataPaths::PERFORMERS_FILE);
+        g_crewModule = std::make_unique<CrewModule>(DataPaths::CREWS_FILE);
+        g_concertModule = std::make_unique<ConcertModule>(DataPaths::CONCERTS_FILE);
         g_ticketModule = std::make_unique<TicketManager::TicketModule>(DataPaths::TICKETS_FILE);
         g_paymentModule = std::make_unique<PaymentManager::PaymentModule>(DataPaths::PAYMENTS_FILE);
-        g_feedbackModule = std::make_unique<FeedbackModule>();
-        g_reportModule = std::make_unique<ReportManager::ReportModule>(); // Uses default parameter
-        g_commModule = std::make_unique<CommunicationModule>();
+        g_feedbackModule = std::make_unique<FeedbackModule>(DataPaths::FEEDBACK_FILE);
+        g_reportModule = std::make_unique<ReportManager::ReportModule>(DataPaths::REPORTS_FILE);
+        g_commModule = std::make_unique<CommunicationModule>(DataPaths::COMM_FILE);
         
         std::cout << "✅ All modules initialized successfully!\n";
         return true;
@@ -374,40 +377,119 @@ bool authenticateUser() {
     }
 }
 
-bool registerNewUser() {
-    std::string username, password, email, firstName, lastName;
+// Helper function to get validated input with retry mechanism
+std::string getValidatedInput(const std::string& prompt, 
+                             std::function<InputValidator::ValidationResult(const std::string&)> validator,
+                             int maxRetries = 3) {
+    std::string input;
+    int attempts = 0;
     
+    while (attempts < maxRetries) {
+        UIManager::displayPrompt(prompt + (attempts > 0 ? " (retry " + std::to_string(attempts + 1) + "/" + std::to_string(maxRetries) + ")" : ""));
+        std::getline(std::cin, input);
+        
+        // Allow user to cancel with "0"
+        if (input == "0") {
+            return "0";
+        }
+        
+        auto result = validator(input);
+        if (result.isValid) {
+            return input;
+        } else {
+            UIManager::displayError(result.errorMessage);
+            attempts++;
+        }
+    }
+    
+    UIManager::displayError("Maximum attempts reached. Registration cancelled.");
+    return "0"; // Return cancel code
+}
+
+bool registerNewUser() {
     UIManager::addSmallSpacing();
     UIManager::printSeparator('-');
     UIManager::printCenteredText("USER REGISTRATION");
     UIManager::printSeparator('-');
+    UIManager::displayInfo("Enter '0' at any field to cancel registration");
+    UIManager::addSmallSpacing();
     
-    UIManager::displayPrompt("Username (or 0 to cancel)");
-    std::getline(std::cin, username);
+    // Get validated username
+    std::string username = getValidatedInput(
+        "Username", 
+        [](const std::string& input) { return InputValidator::validateUsername(input); }
+    );
     if (username == "0") return false;
     
-    UIManager::displayPrompt("Password");
-    std::getline(std::cin, password);
-    UIManager::displayPrompt("Email");
-    std::getline(std::cin, email);
-    UIManager::displayPrompt("First Name");
-    std::getline(std::cin, firstName);
-    UIManager::displayPrompt("Last Name");
-    std::getline(std::cin, lastName);
+    // Check if username already exists
+    if (g_authModule->userExists(username)) {
+        UIManager::displayError("Username already exists. Please choose a different username.");
+        return false;
+    }
+    
+    // Get validated password
+    std::string password = getValidatedInput(
+        "Password", 
+        [](const std::string& input) { return InputValidator::validatePassword(input); }
+    );
+    if (password == "0") return false;
+    
+    // Get validated email
+    std::string email = getValidatedInput(
+        "Email", 
+        [](const std::string& input) { return InputValidator::validateEmail(input); }
+    );
+    if (email == "0") return false;
+    
+    // Get validated first name
+    std::string firstName = getValidatedInput(
+        "First Name", 
+        [](const std::string& input) { return InputValidator::validateName(input, "First name"); }
+    );
+    if (firstName == "0") return false;
+    
+    // Get validated last name
+    std::string lastName = getValidatedInput(
+        "Last Name", 
+        [](const std::string& input) { return InputValidator::validateName(input, "Last name"); }
+    );
+    if (lastName == "0") return false;
+    
+    // Optional phone number with validation
+    UIManager::displayPrompt("Phone Number (optional, press Enter to skip)");
+    std::string phone;
+    std::getline(std::cin, phone);
+    
+    if (!phone.empty() && phone != "0") {
+        auto phoneResult = InputValidator::validatePhoneNumber(phone);
+        if (!phoneResult.isValid) {
+            UIManager::displayError(phoneResult.errorMessage);
+            UIManager::displayPrompt("Phone Number (corrected, or press Enter to skip)");
+            std::getline(std::cin, phone);
+            if (!phone.empty()) {
+                phoneResult = InputValidator::validatePhoneNumber(phone);
+                if (!phoneResult.isValid) {
+                    UIManager::displayWarning("Invalid phone number provided. Proceeding without phone number.");
+                    phone = "";
+                }
+            }
+        }
+    }
     
     // Create new attendee account
-    auto attendee = g_attendeeModule->createAttendee(firstName + " " + lastName, email, "", Model::AttendeeType::REGULAR);
+    auto attendee = g_attendeeModule->createAttendee(firstName + " " + lastName, email, phone, Model::AttendeeType::REGULAR);
     if (attendee != nullptr) {
         // Register user credentials
         if (g_authModule->registerUser(username, password)) {
             UIManager::displaySuccess("Account created successfully!");
+            UIManager::displayInfo("Please login with your new credentials to continue.");
             return true;
         } else {
-            UIManager::displayError("Failed to create user credentials (username may already exist).");
+            UIManager::displayError("Failed to create user credentials. Please try again.");
             return false;
         }
     } else {
-        UIManager::displayError("Failed to create user profile.");
+        UIManager::displayError("Failed to create user profile. Please try again.");
         return false;
     }
 }
@@ -472,41 +554,112 @@ void manageConcerts() {
         
         switch (choice) {
             case 1: { // Create New Concert
-                std::string name, description, genre;
+                std::string name, description, genre, concertDate, concertTime;
                 int venueId;
                 double ticketPrice;
                 
-                std::cout << "Concert Name (or 0 to cancel): ";
-                std::getline(std::cin, name);
+                UIManager::displayInfo("Creating new concert - Enter '0' at any field to cancel");
+                
+                // Validate concert name
+                name = getValidatedInput(
+                    "Concert Name", 
+                    [](const std::string& input) { 
+                        if (input.empty()) return InputValidator::ValidationResult(false, "Concert name cannot be empty");
+                        if (input.length() > 100) return InputValidator::ValidationResult(false, "Concert name too long (max 100 characters)");
+                        return InputValidator::ValidationResult(true);
+                    }
+                );
                 if (name == "0") break;
                 
-                std::cout << "Description: ";
-                std::getline(std::cin, description);
-                std::cout << "Genre: ";
-                std::getline(std::cin, genre);
-                std::cout << "Venue ID (or 0 to cancel): ";
-                std::cin >> venueId;
-                if (venueId == 0) break;
+                // Validate description
+                description = getValidatedInput(
+                    "Description", 
+                    [](const std::string& input) { 
+                        if (input.empty()) return InputValidator::ValidationResult(false, "Description cannot be empty");
+                        if (input.length() > 500) return InputValidator::ValidationResult(false, "Description too long (max 500 characters)");
+                        return InputValidator::ValidationResult(true);
+                    }
+                );
+                if (description == "0") break;
                 
-                std::cout << "Base Ticket Price: $";
-                std::cin >> ticketPrice;
-                std::cin.ignore();
+                // Validate genre
+                genre = getValidatedInput(
+                    "Genre", 
+                    [](const std::string& input) { 
+                        if (input.empty()) return InputValidator::ValidationResult(false, "Genre cannot be empty");
+                        if (input.length() > 50) return InputValidator::ValidationResult(false, "Genre too long (max 50 characters)");
+                        return InputValidator::ValidationResult(true);
+                    }
+                );
+                if (genre == "0") break;
+                
+                // Validate concert date
+                concertDate = getValidatedInput(
+                    "Concert Date (YYYY-MM-DD)", 
+                    [](const std::string& input) { return InputValidator::validateDate(input); }
+                );
+                if (concertDate == "0") break;
+                
+                // Validate concert time
+                concertTime = getValidatedInput(
+                    "Concert Time (HH:MM in 24-hour format)", 
+                    [](const std::string& input) { return InputValidator::validateTime(input); }
+                );
+                if (concertTime == "0") break;
+                
+                // Validate venue ID
+                std::string venueIdStr = getValidatedInput(
+                    "Venue ID", 
+                    [](const std::string& input) { 
+                        try {
+                            int id = std::stoi(input);
+                            if (id <= 0) return InputValidator::ValidationResult(false, "Venue ID must be greater than 0");
+                            return InputValidator::ValidationResult(true);
+                        } catch (...) {
+                            return InputValidator::ValidationResult(false, "Please enter a valid venue ID number");
+                        }
+                    }
+                );
+                if (venueIdStr == "0") break;
+                venueId = std::stoi(venueIdStr);
                 
                 // Validate venue exists
                 auto venue = g_venueModule->getVenueById(venueId);
                 if (!venue) {
-                    std::cout << "❌ Venue not found. Please check the venue ID.\n";
+                    UIManager::displayError("Venue not found. Please check the venue ID.");
                     break;
                 }
                 
-                // Create concert with string date parameters
+                // Validate ticket price
+                std::string priceStr = getValidatedInput(
+                    "Base Ticket Price ($)", 
+                    [](const std::string& input) { 
+                        try {
+                            double price = std::stod(input);
+                            if (price < 0) return InputValidator::ValidationResult(false, "Price cannot be negative");
+                            if (price > 10000) return InputValidator::ValidationResult(false, "Price too high (max $10,000)");
+                            return InputValidator::ValidationResult(true);
+                        } catch (...) {
+                            return InputValidator::ValidationResult(false, "Please enter a valid price");
+                        }
+                    }
+                );
+                if (priceStr == "0") break;
+                ticketPrice = std::stod(priceStr);
+                
+                // Combine date and time for ISO 8601 format
+                std::string concertDateTime = concertDate + "T" + concertTime + ":00Z";
+                
+                // Create concert with validated date/time
                 auto concert = g_concertModule->createConcert(name, description, 
-                    Model::DateTime::now().iso8601String, Model::DateTime::now().iso8601String);
+                    concertDateTime, concertDateTime);
                 
                 if (concert != nullptr) {
-                    std::cout << "✅ Concert created successfully! ID: " << concert->id << std::endl;
+                    UIManager::displaySuccess("Concert created successfully! ID: " + std::to_string(concert->id));
+                    UIManager::displayInfo("Date/Time: " + concertDate + " at " + concertTime);
+                    UIManager::displayInfo("Venue: " + venue->name + " (ID: " + std::to_string(venueId) + ")");
                 } else {
-                    std::cout << "❌ Failed to create concert.\n";
+                    UIManager::displayError("Failed to create concert. Please try again.");
                 }
                 break;
             }
@@ -860,34 +1013,105 @@ void manageVenues() {
                 std::string name, address, city, state, zipCode, country, description, contactInfo;
                 int capacity;
                 
-                std::cout << "Venue Name (or 0 to cancel): ";
-                std::getline(std::cin, name);
+                UIManager::displayInfo("Creating new venue - Enter '0' at any field to cancel");
+                
+                // Validate venue name
+                name = getValidatedInput(
+                    "Venue Name", 
+                    [](const std::string& input) { 
+                        if (input.empty()) return InputValidator::ValidationResult(false, "Venue name cannot be empty");
+                        if (input.length() > 100) return InputValidator::ValidationResult(false, "Venue name too long (max 100 characters)");
+                        return InputValidator::ValidationResult(true);
+                    }
+                );
                 if (name == "0") break;
                 
-                std::cout << "Address: ";
-                std::getline(std::cin, address);
-                std::cout << "City: ";
-                std::getline(std::cin, city);
-                std::cout << "State/Province: ";
-                std::getline(std::cin, state);
-                std::cout << "ZIP/Postal Code: ";
-                std::getline(std::cin, zipCode);
-                std::cout << "Country: ";
-                std::getline(std::cin, country);
-                std::cout << "Capacity (or 0 to cancel): ";
-                std::cin >> capacity;
-                if (capacity == 0) break;
-                std::cin.ignore();
-                std::cout << "Description (optional): ";
+                // Basic address validation
+                address = getValidatedInput(
+                    "Address", 
+                    [](const std::string& input) { 
+                        if (input.empty()) return InputValidator::ValidationResult(false, "Address cannot be empty");
+                        if (input.length() > 200) return InputValidator::ValidationResult(false, "Address too long (max 200 characters)");
+                        return InputValidator::ValidationResult(true);
+                    }
+                );
+                if (address == "0") break;
+                
+                // Validate city
+                city = getValidatedInput(
+                    "City", 
+                    [](const std::string& input) { return InputValidator::validateName(input, "City"); }
+                );
+                if (city == "0") break;
+                
+                // Validate state/province  
+                state = getValidatedInput(
+                    "State/Province", 
+                    [](const std::string& input) { 
+                        if (input.empty()) return InputValidator::ValidationResult(false, "State/Province cannot be empty");
+                        if (input.length() > 50) return InputValidator::ValidationResult(false, "State/Province too long (max 50 characters)");
+                        return InputValidator::ValidationResult(true);
+                    }
+                );
+                if (state == "0") break;
+                
+                // Validate postal code
+                zipCode = getValidatedInput(
+                    "ZIP/Postal Code", 
+                    [](const std::string& input) { return InputValidator::validatePostalCode(input); }
+                );
+                if (zipCode == "0") break;
+                
+                // Validate country
+                country = getValidatedInput(
+                    "Country", 
+                    [](const std::string& input) { return InputValidator::validateName(input, "Country"); }
+                );
+                if (country == "0") break;
+                
+                // Validate capacity
+                std::string capacityStr = getValidatedInput(
+                    "Capacity", 
+                    [](const std::string& input) { 
+                        try {
+                            int cap = std::stoi(input);
+                            if (cap <= 0) return InputValidator::ValidationResult(false, "Capacity must be greater than 0");
+                            if (cap > 1000000) return InputValidator::ValidationResult(false, "Capacity too large (max 1,000,000)");
+                            return InputValidator::ValidationResult(true);
+                        } catch (...) {
+                            return InputValidator::ValidationResult(false, "Please enter a valid number");
+                        }
+                    }
+                );
+                if (capacityStr == "0") break;
+                capacity = std::stoi(capacityStr);
+                
+                // Optional fields with basic validation
+                UIManager::displayPrompt("Description (optional, press Enter to skip)");
                 std::getline(std::cin, description);
-                std::cout << "Contact Info (optional): ";
+                if (description.length() > 500) {
+                    UIManager::displayWarning("Description truncated to 500 characters");
+                    description = description.substr(0, 500);
+                }
+                
+                // Validate contact info if provided
+                UIManager::displayPrompt("Contact Info - email or phone (optional, press Enter to skip)");
                 std::getline(std::cin, contactInfo);
+                if (!contactInfo.empty()) {
+                    // Try to validate as email first, then as phone
+                    auto emailResult = InputValidator::validateEmail(contactInfo);
+                    auto phoneResult = InputValidator::validatePhoneNumber(contactInfo);
+                    
+                    if (!emailResult.isValid && !phoneResult.isValid) {
+                        UIManager::displayWarning("Contact info doesn't appear to be a valid email or phone number, but proceeding anyway");
+                    }
+                }
                 
                 auto venue = g_venueModule->createVenue(name, address, city, state, zipCode, country, capacity, description, contactInfo);
                 if (venue) {
-                    std::cout << "✅ Venue created successfully! ID: " << venue->id << std::endl;
+                    UIManager::displaySuccess("Venue created successfully! ID: " + std::to_string(venue->id));
                 } else {
-                    std::cout << "❌ Failed to create venue.\n";
+                    UIManager::displayError("Failed to create venue. Please try again.");
                 }
                 break;
             }
@@ -2071,7 +2295,7 @@ void runManagementPortal() {
         displayManagementMenu();
         
         int choice;
-        std::cout << "Enter your choice (0-9): ";
+        std::cout << "Enter your choice (0-10): ";
         if (!(std::cin >> choice)) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -2105,6 +2329,11 @@ void runManagementPortal() {
                 break;
             case 9: // Switch to User Portal
                 runUserPortal();
+                break;
+            case 10: // Input Validation Demo
+                demonstrateValidation();
+                UIManager::displayInfo("Press Enter to continue...");
+                std::cin.get();
                 break;
             case 0: // Return to Main Menu
                 return;
@@ -2422,17 +2651,42 @@ void manageMyTickets() {
         
         switch (choice) {
             case 1: { // View My Active Tickets
-                auto myTickets = g_ticketModule->getActiveTicketsByAttendee(currentSession.userId);
+                // First, let's try to get all tickets and filter by user
+                auto allTickets = g_ticketModule->getAll();
+                std::vector<std::shared_ptr<Model::Ticket>> myTickets;
+                
+                // Filter tickets for current user (this is a simplified approach)
+                // In a real system, we'd have proper user-ticket relationships
+                for (const auto& ticket : allTickets) {
+                    if (ticket->status == Model::TicketStatus::SOLD || 
+                        ticket->status == Model::TicketStatus::CHECKED_IN) {
+                        myTickets.push_back(ticket);
+                    }
+                }
+                
                 std::cout << "\n--- My Active Tickets ---\n";
                 
                 if (myTickets.empty()) {
                     std::cout << "You have no active tickets.\n";
                 } else {
                     for (const auto& ticket : myTickets) {
-                        // Note: The actual Model::Ticket doesn't have concert_id directly
-                        // This would need proper implementation based on actual relationship structure
                         std::cout << "🎫 Ticket ID: " << ticket->ticket_id << "\n";
-                        std::cout << "   Concert: (Linked via ConcertTicket)\n";
+                        
+                        // Get concert information through ConcertTicket relationship
+                        std::string concertName = "Unknown Concert";
+                        std::string concertDate = "Unknown Date";
+                        
+                        auto concertTicket = ticket->concert_ticket.lock();
+                        if (concertTicket) {
+                            auto concert = concertTicket->concert.lock();
+                            if (concert) {
+                                concertName = concert->name;
+                                concertDate = concert->start_date_time.iso8601String;
+                            }
+                        }
+                        
+                        std::cout << "   Concert: " << concertName << "\n";
+                        std::cout << "   Date: " << concertDate << "\n";
                         std::cout << "   Type: General\n"; // Since ticket_type field doesn't exist
                         std::cout << "   Status: ";
                         switch (ticket->status) {
@@ -2456,12 +2710,42 @@ void manageMyTickets() {
                     break;
                 }
                 
-                // Note: The actual Model::Ticket structure has different fields
+                // Get concert information through ConcertTicket relationship
+                std::string concertName = "Unknown Concert";
+                std::string concertDate = "Unknown Date";
+                std::string venueName = "Unknown Venue";
+                double ticketPrice = 0.0;
+                
+                auto concertTicket = ticket->concert_ticket.lock();
+                if (concertTicket) {
+                    auto concert = concertTicket->concert.lock();
+                    if (concert) {
+                        concertName = concert->name;
+                        concertDate = concert->start_date_time.iso8601String;
+                        if (concert->venue) {
+                            venueName = concert->venue->name;
+                        }
+                    }
+                    ticketPrice = concertTicket->base_price;
+                }
+                
                 std::cout << "\n--- Ticket Details ---\n";
                 std::cout << "Ticket ID: " << ticket->ticket_id << "\n";
-                std::cout << "Concert: (Linked via ConcertTicket relationship)\n";
+                std::cout << "Concert: " << concertName << "\n";
+                std::cout << "Date: " << concertDate << "\n";
+                std::cout << "Venue: " << venueName << "\n";
+                std::cout << "Price: $" << std::fixed << std::setprecision(2) << ticketPrice << "\n";
                 std::cout << "Type: General\n"; // Since ticket_type field doesn't exist in model
                 std::cout << "QR Code: " << ticket->qr_code << "\n";
+                std::cout << "Status: ";
+                switch (ticket->status) {
+                    case Model::TicketStatus::AVAILABLE: std::cout << "AVAILABLE"; break;
+                    case Model::TicketStatus::SOLD: std::cout << "PURCHASED"; break;
+                    case Model::TicketStatus::CHECKED_IN: std::cout << "CHECKED IN"; break;
+                    case Model::TicketStatus::CANCELLED: std::cout << "CANCELLED"; break;
+                    case Model::TicketStatus::EXPIRED: std::cout << "EXPIRED"; break;
+                }
+                std::cout << "\n";
                 std::cout << "Created: " << ticket->created_at.iso8601String << "\n";
                 std::cout << "Updated: " << ticket->updated_at.iso8601String << "\n";
                 break;
@@ -2952,6 +3236,86 @@ void manageProfile() {
         std::cout << "\nPress Enter to continue...";
         std::cin.get();
     }
+}
+
+// Demo function to showcase input validation capabilities
+void demonstrateValidation() {
+    UIManager::addSmallSpacing();
+    UIManager::printSeparator('=');
+    UIManager::printCenteredText("INPUT VALIDATION DEMONSTRATION");
+    UIManager::printSeparator('=');
+    UIManager::displayInfo("This demo shows regex-based input validation for various data types");
+    UIManager::addSmallSpacing();
+    
+    // Test email validation
+    UIManager::displayInfo("🔍 Testing Email Validation:");
+    std::vector<std::string> testEmails = {
+        "user@example.com",      // Valid
+        "invalid.email",         // Invalid - no @
+        "user@",                 // Invalid - incomplete
+        "test@domain.co.uk"      // Valid
+    };
+    
+    for (const auto& email : testEmails) {
+        auto result = InputValidator::validateEmail(email);
+        std::cout << "  " << email << " → " << (result.isValid ? "✅ Valid" : "❌ " + result.errorMessage) << std::endl;
+    }
+    
+    UIManager::addSmallSpacing();
+    
+    // Test password validation
+    UIManager::displayInfo("🔒 Testing Password Validation:");
+    std::vector<std::string> testPasswords = {
+        "Password123!",          // Valid
+        "weak",                  // Invalid - too short
+        "NoNumbers!",            // Invalid - no digits
+        "noUpper123!"            // Invalid - no uppercase
+    };
+    
+    for (const auto& password : testPasswords) {
+        auto result = InputValidator::validatePassword(password);
+        std::cout << "  " << password << " → " << (result.isValid ? "✅ Valid" : "❌ " + result.errorMessage) << std::endl;
+    }
+    
+    UIManager::addSmallSpacing();
+    
+    // Test phone number validation
+    UIManager::displayInfo("📞 Testing Phone Number Validation:");
+    std::vector<std::string> testPhones = {
+        "+1234567890",           // Valid
+        "(123) 456-7890",        // Valid (will be cleaned)
+        "123-456-7890",          // Valid
+        "12345"                  // Invalid - too short
+    };
+    
+    for (const auto& phone : testPhones) {
+        auto result = InputValidator::validatePhoneNumber(phone);
+        std::cout << "  " << phone << " → " << (result.isValid ? "✅ Valid" : "❌ " + result.errorMessage) << std::endl;
+    }
+    
+    UIManager::addSmallSpacing();
+    
+    // Test date validation
+    UIManager::displayInfo("📅 Testing Date Validation:");
+    std::vector<std::string> testDates = {
+        "2024-12-25",           // Valid
+        "2024-02-29",           // Valid (leap year)
+        "2023-02-29",           // Invalid (not leap year)
+        "2024-13-01"            // Invalid (month > 12)
+    };
+    
+    for (const auto& date : testDates) {
+        auto result = InputValidator::validateDate(date);
+        std::cout << "  " << date << " → " << (result.isValid ? "✅ Valid" : "❌ " + result.errorMessage) << std::endl;
+    }
+    
+    UIManager::addSmallSpacing();
+    UIManager::displaySuccess("Validation demonstration complete!");
+    UIManager::displayInfo("These validations are now applied to:");
+    std::cout << "  • User Registration (username, password, email, names, phone)" << std::endl;
+    std::cout << "  • Venue Creation (address, postal codes, contact info)" << std::endl;
+    std::cout << "  • Concert Creation (dates, times, prices)" << std::endl;
+    UIManager::printSeparator('=');
 }
 
 

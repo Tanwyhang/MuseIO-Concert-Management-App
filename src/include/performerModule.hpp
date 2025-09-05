@@ -24,8 +24,9 @@ public:
     /**
      * @brief Constructor
      * Initializes the module and loads existing performers
+     * @param filePath Path to the performers data file
      */
-    PerformerModule() : BaseModule<Model::Performer>("data/performers.dat") {
+    PerformerModule(const std::string& filePath = "data/performers.dat") : BaseModule<Model::Performer>(filePath) {
         loadEntities();
     }
     

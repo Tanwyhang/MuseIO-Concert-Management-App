@@ -45,14 +45,14 @@ void testUserRegistration(AuthModule& auth) {
     
     for (const auto& user : testUsers) {
         std::cout << "Registering user: " << user.username << " (Type: " << getUserTypeString(user.userType) << ")" << std::endl;
-        bool result = auth.registerUser(user.username, user.password, user.userType);
+        bool result = auth.registerUser(user.username, user.password);
         std::cout << "Registration " << (result ? "successful" : "failed") << std::endl;
         displaySeparator('-', 30);
     }
     
     // Try registering a duplicate user
     std::cout << "Attempting to register duplicate user 'admin'..." << std::endl;
-    bool dupResult = auth.registerUser("admin", "newpassword", 0);
+    bool dupResult = auth.registerUser("admin", "newpassword");
     std::cout << "Registration " << (dupResult ? "successful (unexpected)" : "failed (expected)") << std::endl;
     
     // Report user count
@@ -220,7 +220,7 @@ void interactiveTestMode(AuthModule& auth) {
                 std::cin >> userType;
                 std::cin.ignore();
                 
-                result = auth.registerUser(username, password, userType);
+                result = auth.registerUser(username, password);
                 std::cout << "\nRegistration " << (result ? "successful" : "failed") << "\n";
                 break;
                 

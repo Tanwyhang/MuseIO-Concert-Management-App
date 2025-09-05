@@ -142,6 +142,17 @@ namespace UIManager {
     // Helper function to get current user role (to be implemented in main.cpp)
     std::string getCurrentUserRole();
     
+    // Application banner
+    const std::string APP_BANNER = R"(
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                       🎵 MUSEIO CONCERT MANAGEMENT 🎵                       ║
+║                         Your Complete Concert Solution                       ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+)";
+
     // Menu content with proper spacing
     const std::string AUTH_MENU = R"(1. Login
 2. Register New Account
@@ -160,6 +171,7 @@ namespace UIManager {
 7. Reports & Analytics
 8. Communication Tools
 9. System Settings
+10. Input Validation Demo
 0. Back to Main Menu)";
 
     const std::string USER_MENU_OPTIONS = R"(1. Browse Concerts
@@ -168,6 +180,10 @@ namespace UIManager {
 4. Submit Feedback
 5. Concert Information
 0. Back to Main Menu)";
+    
+    // Menu aliases for backward compatibility
+    const std::string USER_MENU = USER_MENU_OPTIONS;
+    const std::string MANAGEMENT_MENU = MANAGEMENT_MENU_OPTIONS;
     
     // Default user credentials table
     inline void displayDefaultCredentials() {
@@ -206,7 +222,7 @@ namespace UIManager {
         displayManagementPortalBanner();
         std::cout << MANAGEMENT_MENU_OPTIONS << std::endl;
         addSmallSpacing();
-        displayChoicePrompt("0-9");
+        displayChoicePrompt("0-10");
     }
     
     inline void displayUserMenu() {

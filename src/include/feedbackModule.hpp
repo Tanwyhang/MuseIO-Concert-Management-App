@@ -78,8 +78,9 @@ private:
 public:
     /**
      * @brief Constructor with priority queue initialization
+     * @param filePath Path to the feedback data file
      */
-    FeedbackModule() : BaseModule<Model::Feedback>("data/feedback.dat"),
+    FeedbackModule(const std::string& filePath = "data/feedback.dat") : BaseModule<Model::Feedback>(filePath),
                        urgentQueue([](ExtendedFeedback* a, ExtendedFeedback* b) {
                            // Higher priority for lower ratings and critical sentiment
                            if (a->baseFeedback->rating != b->baseFeedback->rating) {

@@ -96,8 +96,9 @@ private:
 public:
     /**
      * @brief Constructor
+     * @param filePath Path to the communications data file
      */
-    CommunicationModule() : BaseModule<Model::CommunicationLog>("data/communications.dat"),
+    CommunicationModule(const std::string& filePath = "data/communications.dat") : BaseModule<Model::CommunicationLog>(filePath),
                             next_message_id(1) {
         loadEntities();
         loadChatData();

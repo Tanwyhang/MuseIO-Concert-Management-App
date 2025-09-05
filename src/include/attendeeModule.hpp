@@ -24,8 +24,9 @@ public:
     /**
      * @brief Constructor
      * Initializes the module and loads existing attendees
+     * @param filePath Path to the attendees data file
      */
-    AttendeeModule() : BaseModule<Model::Attendee>("data/attendees.dat") {
+    AttendeeModule(const std::string& filePath = "data/attendees.dat") : BaseModule<Model::Attendee>(filePath) {
         loadEntities();
     }
     

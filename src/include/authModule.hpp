@@ -23,12 +23,15 @@
 class AuthModule {
 private:
     // Memory block for storing credential data
-    char* secureMemory;
-    size_t memorySize;
+    char* secureMemory = nullptr;
+    size_t memorySize = 0;
     
     // Encryption key (used for XOR operations)
-    unsigned char* encryptionKey;
-    size_t keySize;
+    unsigned char* encryptionKey = nullptr;
+    size_t keySize = 0;
+    
+    // Authentication data file path
+    std::string authDataFile;
     
     // In-memory credential mapping (username -> offset in secureMemory)
     std::unordered_map<std::string, size_t> credentialMap;
@@ -94,6 +97,10 @@ private:
      * @param length Length of data
      */
     void xorCrypt(unsigned char* data, size_t length) {
+        if (!encryptionKey || keySize == 0) {
+            throw std::runtime_error("Encryption key not initialized");
+        }
+        
         for (size_t i = 0; i < length; ++i) {
             *(data + i) ^= *(encryptionKey + (i % keySize));
         }
@@ -183,6 +190,14 @@ private:
      * @brief Generate encryption key
      */
     void generateEncryptionKey() {
+        // Clean up existing key if any
+        if (encryptionKey) {
+            for (size_t i = 0; i < keySize; ++i) {
+                *(encryptionKey + i) = 0;
+            }
+            delete[] encryptionKey;
+        }
+        
         keySize = 32; // 256-bit key
         encryptionKey = new unsigned char[keySize];
         
@@ -199,8 +214,10 @@ public:
     /**
      * @brief Constructor
      * @param initialMemorySize Initial size of secure memory buffer
+     * @param authFilePath Path to the authentication data file
      */
-    AuthModule(size_t initialMemorySize = 4096) {
+    AuthModule(size_t initialMemorySize = 4096, const std::string& authFilePath = "data/auth.dat") 
+        : authDataFile(authFilePath) {
         // Allocate secure memory
         secureMemory = new char[initialMemorySize];
         memorySize = initialMemorySize;
@@ -210,12 +227,24 @@ public:
         
         // Generate encryption key
         generateEncryptionKey();
+        
+        // Try to load existing credentials from file (if file exists)
+        // If loading fails, we continue with empty credentials
+        if (!loadCredentials(authDataFile)) {
+            // File doesn't exist or failed to load - this is normal for first run
+            // Keep the initialized empty state
+        }
     }
     
     /**
      * @brief Destructor - securely wipes memory before deallocation
      */
     ~AuthModule() {
+        // Save credentials before cleanup (safety backup)
+        if (!credentialMap.empty()) {
+            saveCredentials(authDataFile);
+        }
+        
         // Securely wipe encryption key
         if (encryptionKey) {
             for (size_t i = 0; i < keySize; ++i) {
@@ -256,6 +285,9 @@ public:
         
         // Store in secure memory (userType = 0 for all users)
         storeCredential(username, passwordHash, salt, 0);
+        
+        // Save credentials to file immediately after registration
+        saveCredentials(authDataFile);
         
         return true;
     }
@@ -353,6 +385,9 @@ public:
         // Store back in secure memory
         std::memcpy(secureMemory + offset, block, CREDENTIAL_BLOCK_SIZE);
         
+        // Save credentials to file after password change
+        saveCredentials(authDataFile);
+        
         return true;
     }
     
@@ -377,6 +412,9 @@ public:
         
         // Remove from map
         credentialMap.erase(it);
+        
+        // Save credentials to file after user deletion
+        saveCredentials(authDataFile);
         
         return true;
     }
@@ -483,8 +521,12 @@ public:
      * @return True if save successful
      */
     bool saveCredentials(const std::string& filePath) {
+        std::cout << "[SAVE] saveCredentials called for: " << filePath << std::endl;
+        std::cout << "[SAVE] keySize=" << keySize << ", mapSize=" << credentialMap.size() << std::endl;
+        
         std::ofstream file(filePath, std::ios::binary);
         if (!file) {
+            std::cout << "[SAVE] Failed to open file for writing!" << std::endl;
             return false;
         }
         
@@ -512,6 +554,7 @@ public:
             file.write(reinterpret_cast<const char*>(&entry.second), sizeof(entry.second));
         }
         
+        std::cout << "[SAVE] File saved successfully!" << std::endl;
         return true;
     }
     
@@ -523,60 +566,104 @@ public:
     bool loadCredentials(const std::string& filePath) {
         std::ifstream file(filePath, std::ios::binary);
         if (!file) {
+            // File doesn't exist - this is normal for first run
             return false;
         }
         
-        // Clean up existing data
-        if (secureMemory) {
-            for (size_t i = 0; i < memorySize; ++i) {
-                *(secureMemory + i) = 0;
+        // Temporary variables to load into first
+        size_t tempMemorySize, tempKeySize;
+        unsigned char* tempEncryptionKey = nullptr;
+        char* tempSecureMemory = nullptr;
+        std::unordered_map<std::string, size_t> tempCredentialMap;
+        
+        try {
+            // Read memory size
+            file.read(reinterpret_cast<char*>(&tempMemorySize), sizeof(tempMemorySize));
+            if (file.fail()) throw std::runtime_error("Failed to read memory size");
+            
+            // Read key size
+            file.read(reinterpret_cast<char*>(&tempKeySize), sizeof(tempKeySize));
+            if (file.fail()) throw std::runtime_error("Failed to read key size");
+            
+            // Validate loaded key size
+            if (tempKeySize == 0 || tempKeySize > 256) {
+                throw std::runtime_error("Invalid key size in file - file may be corrupted");
             }
-            delete[] secureMemory;
-            secureMemory = nullptr;
-        }
-        
-        if (encryptionKey) {
-            for (size_t i = 0; i < keySize; ++i) {
-                *(encryptionKey + i) = 0;
+            
+            // Read encryption key
+            tempEncryptionKey = new unsigned char[tempKeySize];
+            file.read(reinterpret_cast<char*>(tempEncryptionKey), tempKeySize);
+            if (file.fail()) throw std::runtime_error("Failed to read encryption key");
+            
+            // Read secure memory
+            tempSecureMemory = new char[tempMemorySize];
+            file.read(tempSecureMemory, tempMemorySize);
+            if (file.fail()) throw std::runtime_error("Failed to read secure memory");
+            
+            // Read map size
+            size_t mapSize;
+            file.read(reinterpret_cast<char*>(&mapSize), sizeof(mapSize));
+            if (file.fail()) throw std::runtime_error("Failed to read map size");
+            
+            // Read map entries
+            for (size_t i = 0; i < mapSize; ++i) {
+                size_t usernameLength;
+                file.read(reinterpret_cast<char*>(&usernameLength), sizeof(usernameLength));
+                if (file.fail()) throw std::runtime_error("Failed to read username length");
+                
+                std::string username(usernameLength, '\0');
+                file.read(&username[0], usernameLength);
+                if (file.fail()) throw std::runtime_error("Failed to read username");
+                
+                size_t offset;
+                file.read(reinterpret_cast<char*>(&offset), sizeof(offset));
+                if (file.fail()) throw std::runtime_error("Failed to read offset");
+                
+                tempCredentialMap[username] = offset;
             }
-            delete[] encryptionKey;
-            encryptionKey = nullptr;
+            
+            // If we get here, loading was successful - now update the actual data
+            
+            // Clean up existing data
+            if (secureMemory) {
+                for (size_t i = 0; i < memorySize; ++i) {
+                    *(secureMemory + i) = 0;
+                }
+                delete[] secureMemory;
+            }
+            
+            if (encryptionKey) {
+                for (size_t i = 0; i < keySize; ++i) {
+                    *(encryptionKey + i) = 0;
+                }
+                delete[] encryptionKey;
+            }
+            
+            // Replace with loaded data
+            memorySize = tempMemorySize;
+            keySize = tempKeySize;
+            encryptionKey = tempEncryptionKey;
+            secureMemory = tempSecureMemory;
+            credentialMap = std::move(tempCredentialMap);
+            
+            return true;
+            
+        } catch (const std::exception& e) {
+            // Clean up temporary allocations on error
+            if (tempEncryptionKey) {
+                for (size_t i = 0; i < tempKeySize; ++i) {
+                    *(tempEncryptionKey + i) = 0;
+                }
+                delete[] tempEncryptionKey;
+            }
+            if (tempSecureMemory) {
+                for (size_t i = 0; i < tempMemorySize; ++i) {
+                    *(tempSecureMemory + i) = 0;
+                }
+                delete[] tempSecureMemory;
+            }
+            
+            return false;
         }
-        
-        credentialMap.clear();
-        
-        // Read memory size
-        file.read(reinterpret_cast<char*>(&memorySize), sizeof(memorySize));
-        
-        // Read key size
-        file.read(reinterpret_cast<char*>(&keySize), sizeof(keySize));
-        
-        // Read encryption key
-        encryptionKey = new unsigned char[keySize];
-        file.read(reinterpret_cast<char*>(encryptionKey), keySize);
-        
-        // Read secure memory
-        secureMemory = new char[memorySize];
-        file.read(secureMemory, memorySize);
-        
-        // Read map size
-        size_t mapSize;
-        file.read(reinterpret_cast<char*>(&mapSize), sizeof(mapSize));
-        
-        // Read map entries
-        for (size_t i = 0; i < mapSize; ++i) {
-            size_t usernameLength;
-            file.read(reinterpret_cast<char*>(&usernameLength), sizeof(usernameLength));
-            
-            std::string username(usernameLength, '\0');
-            file.read(&username[0], usernameLength);
-            
-            size_t offset;
-            file.read(reinterpret_cast<char*>(&offset), sizeof(offset));
-            
-            credentialMap[username] = offset;
-        }
-        
-        return true;
     }
 };

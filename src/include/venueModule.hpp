@@ -24,8 +24,9 @@ public:
     /**
      * @brief Constructor
      * Initializes the module and loads existing venues
+     * @param filePath Path to the venues data file
      */
-    VenueModule() : BaseModule<Model::Venue>("data/venues.dat") {
+    VenueModule(const std::string& filePath = "data/venues.dat") : BaseModule<Model::Venue>(filePath) {
         loadEntities();
     }
 

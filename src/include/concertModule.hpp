@@ -23,8 +23,9 @@ public:
     /**
      * @brief Constructor
      * Initializes the module and loads existing concerts
+     * @param filePath Path to the concerts data file
      */
-    ConcertModule() : BaseModule<Model::Concert>("data/concerts.dat") {
+    ConcertModule(const std::string& filePath = "data/concerts.dat") : BaseModule<Model::Concert>(filePath) {
         loadEntities();
     }
 

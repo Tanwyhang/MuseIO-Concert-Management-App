@@ -511,9 +511,9 @@ int main() {
         
         try {
             // Create test users (admin, staff, regular user)
-            bool adminReg = auth.registerUser("admin", "admin123", 1);
-            bool userReg = auth.registerUser("testuser", "user123", 0);
-            bool staffReg = auth.registerUser("staff", "staff123", 2);
+            bool adminReg = auth.registerUser("admin", "admin123");
+            bool userReg = auth.registerUser("testuser", "user123");
+            bool staffReg = auth.registerUser("staff", "staff123");
             
             if (!adminReg || !userReg || !staffReg) {
                 reporter.testFailed("Auth Registration", "Failed to register test users");

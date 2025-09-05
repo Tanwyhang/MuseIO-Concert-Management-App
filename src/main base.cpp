@@ -22,7 +22,7 @@ void displayMainMenu();
 
 void displayMainMenu() {
     // Display the main menu banner using UIManager strings
-    std::cout << UIManager::MAIN_MENU;
+    std::cout << UIManager::APP_BANNER;
 }
 
 void runManagementPortal() {

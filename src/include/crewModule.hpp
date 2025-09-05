@@ -29,8 +29,9 @@ public:
     /**
      * @brief Constructor
      * Initializes the module and loads existing crew members
+     * @param filePath Path to the crew data file
      */
-    CrewModule() : BaseModule<Model::Crew>("data/crews.dat") {
+    CrewModule(const std::string& filePath = "data/crews.dat") : BaseModule<Model::Crew>(filePath) {
         loadEntities();
     }
     
