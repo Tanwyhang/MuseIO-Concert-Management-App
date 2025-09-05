@@ -1,3 +1,63 @@
+# VS Code
 .vscode/
 .vscode/c_cpp_properties.json
 .vscode/settings.json
+
+# Compiled binaries
+*.exe
+*.out
+*.app
+*.dll
+*.so
+*.dylib
+
+# Object files
+*.o
+*.obj
+*.elf
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Static libraries
+*.a
+*.lib
+
+# Temporary files
+*.tmp
+*.temp
+*~
+.DS_Store
+Thumbs.db
+
+# Compiler-specific
+*.d
+*.gch
+*.pch
+
+# Build directories
+build/
+bin/
+obj/
+debug/
+release/
+
+# IDE files (additional)
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+
+# CMake (if used)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Data files (optional - uncomment if you don't want to track data)
+# data/*.dat
