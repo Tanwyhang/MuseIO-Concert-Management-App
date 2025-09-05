@@ -85,48 +85,16 @@ void displayDemoCredentialsAndTests() {
     std::cout << "\n📋 DEMO CREDENTIALS FOR TESTING:" << std::endl;
     std::cout << std::string(60, '-') << std::endl;
     
-    // Fetch admin credentials dynamically
-    std::vector<std::pair<std::string, int>> adminUsers;
-    if (g_authModule) {
-        adminUsers = g_authModule->getAdminUsers();
-    }
-    
-    std::cout << "ADMIN ACCOUNTS:" << std::endl;
-    if (!adminUsers.empty()) {
-        for (const auto& admin : adminUsers) {
-            std::cout << "  Username: " << admin.first << std::endl;
-            // Note: Passwords are hashed and cannot be retrieved for security
-            std::cout << "  Password: [Contact system administrator for password]" << std::endl;
-        }
-    } else {
-        // Fallback to default admin credentials if none exist
-        std::cout << "  Username: admin    | Password: admin123" << std::endl;
-        std::cout << "  Username: sysadmin | Password: sys123" << std::endl;
-    }
+    std::cout << "TEST ACCOUNTS (All users have access to both portals):" << std::endl;
+    std::cout << "  Username: admin    | Password: admin123" << std::endl;
+    std::cout << "  Username: manager1 | Password: manager123" << std::endl;
+    std::cout << "  Username: staff1   | Password: staff123" << std::endl;
+    std::cout << "  Username: user1    | Password: user123" << std::endl;
+    std::cout << "  Username: vip1     | Password: vip123" << std::endl;
     std::cout << std::endl;
-    
-    std::cout << "MANAGEMENT ACCOUNTS:" << std::endl;
-    std::cout << "  Username: manager  | Password: mgr123" << std::endl;
-    std::cout << "  Username: director | Password: dir123" << std::endl;
-    std::cout << std::endl;
-    
-    // Fetch staff credentials dynamically
-    std::vector<std::pair<std::string, int>> staffUsers;
-    if (g_authModule) {
-        staffUsers = g_authModule->getStaffUsers();
-    }
-    
-    std::cout << "STAFF ACCOUNTS:" << std::endl;
-    if (!staffUsers.empty()) {
-        for (const auto& staff : staffUsers) {
-            std::cout << "  Username: " << staff.first << std::endl;
-            std::cout << "  Password: [Contact system administrator for password]" << std::endl;
-        }
-    } else {
-        // Fallback to default staff credentials if none exist
-        std::cout << "  Username: staff1   | Password: staff123" << std::endl;
-        std::cout << "  Username: staff2   | Password: staff456" << std::endl;
-    }
+    std::cout << "  Username: staff1   | Password: staff123" << std::endl;
+    std::cout << "  Username: user1    | Password: user123" << std::endl;
+    std::cout << "  Username: vip1     | Password: vip123" << std::endl;
     std::cout << std::endl;
     
     // Fetch regular user credentials dynamically
@@ -247,13 +215,12 @@ void displayDemoCredentialsAndTests() {
     std::cout << "📊 CROSS-MODULE INTEGRATION TESTS:" << std::endl;
     std::cout << "  55. Complete concert booking workflow (venue → performer → concert → ticket → payment)" << std::endl;
     std::cout << "  56. End-to-end attendee experience (registration → concert search → ticket purchase → feedback)" << std::endl;
-    std::cout << "  57. Staff workflow (login → concert management → ticket validation → feedback review)" << std::endl;
-    std::cout << "  58. Admin oversight (user management → system reports → data analysis)" << std::endl;
+    std::cout << "  57. User workflow (login → concert browsing → ticket purchase → feedback)" << std::endl;
+    std::cout << "  58. Management workflow (login → concert management → system reports)" << std::endl;
     std::cout << std::endl;
     
     std::cout << "⚠️  TESTING NOTES:" << std::endl;
-    std::cout << "  • Use admin/manager accounts for full system access" << std::endl;
-    std::cout << "  • Regular users can only access user portal features" << std::endl;
+    std::cout << "  • All users can access both management and user portal features" << std::endl;
     std::cout << "  • All data is persisted to binary files in the data/ directory" << std::endl;
     std::cout << "  • Test both successful operations and error conditions" << std::endl;
     std::cout << "  • Verify cross-module relationships (concert-venue, ticket-attendee, etc.)" << std::endl;
@@ -291,47 +258,38 @@ bool initializeModules() {
 }
 
 bool initializeDefaultUsers() {
+    UIManager::addSmallSpacing();
     std::cout << "Setting up default user accounts...\n";
     
     try {
-        // Create default users with different roles
+        // Create default users
         struct DefaultUser {
             std::string username;
             std::string password;
-            int userType;
             std::string description;
         };
         
         std::vector<DefaultUser> defaultUsers = {
-            {"admin", "admin123", 0, "System Administrator"},
-            {"manager1", "manager123", 1, "Concert Manager"},
-            {"staff1", "staff123", 2, "Staff Member"},
-            {"user1", "user123", 3, "Regular User"},
-            {"vip1", "vip123", 4, "VIP User"}
+            {"admin", "admin123", "System Administrator"},
+            {"manager1", "manager123", "Concert Manager"},
+            {"staff1", "staff123", "Staff Member"},
+            {"user1", "user123", "Regular User"},
+            {"vip1", "vip123", "VIP User"}
         };
         
         for (const auto& user : defaultUsers) {
-            if (g_authModule->registerUser(user.username, user.password, user.userType)) {
+            if (g_authModule->registerUser(user.username, user.password)) {
                 std::cout << "✅ Created " << user.description << " account: " << user.username << std::endl;
             } else {
                 std::cout << "⚠️  Account " << user.username << " may already exist" << std::endl;
             }
         }
         
-        std::cout << "\n📋 Default login credentials:\n";
-        std::cout << "┌─────────────┬─────────────┬──────────────────┐\n";
-        std::cout << "│ Username    │ Password    │ Role             │\n";
-        std::cout << "├─────────────┼─────────────┼──────────────────┤\n";
-        for (const auto& user : defaultUsers) {
-            std::cout << "│ " << std::left << std::setw(11) << user.username 
-                      << " │ " << std::setw(11) << user.password 
-                      << " │ " << std::setw(16) << user.description << " │\n";
-        }
-        std::cout << "└─────────────┴─────────────┴──────────────────┘\n\n";
+        UIManager::displayDefaultCredentials();
         
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "❌ Failed to create default users: " << e.what() << std::endl;
+        UIManager::displayError("Failed to create default users: " + std::string(e.what()));
         return false;
     }
 }
@@ -358,14 +316,7 @@ void cleanupModules() {
 
 // Authentication system implementation
 void displayAuthMenu() {
-    std::cout << "\n" << std::string(50, '=') << std::endl;
-    std::cout << "           MuseIO Concert Management" << std::endl;
-    std::cout << "               Authentication" << std::endl;
-    std::cout << std::string(50, '=') << std::endl;
-    std::cout << "1. Login" << std::endl;
-    std::cout << "2. Register New Account" << std::endl;
-    std::cout << "0. Exit" << std::endl;
-    std::cout << std::string(50, '=') << std::endl;
+    UIManager::displayAuthMenu();
 }
 
 bool authenticateUser() {
@@ -378,7 +329,7 @@ bool authenticateUser() {
         if (!(std::cin >> choice)) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-            std::cout << "❌ Invalid input. Please enter a number.\n";
+            UIManager::displayError("Invalid input. Please enter a number.");
             continue;
         }
         
@@ -387,47 +338,38 @@ bool authenticateUser() {
         switch (choice) {
             case 1: { // Login
                 std::string username, password;
-                std::cout << "Username (or 0 to cancel): ";
+                UIManager::displayPrompt("Username (or 0 to cancel)");
                 std::getline(std::cin, username);
                 if (username == "0") break;
                 
-                std::cout << "Password: ";
+                UIManager::displayPrompt("Password");
                 std::getline(std::cin, password);
                 
-                int userType = g_authModule->authenticateUser(username, password);
-                if (userType != -1) {
+                bool isAuthenticated = g_authModule->authenticateUser(username, password);
+                if (isAuthenticated) {
                     currentSession.username = username;
                     currentSession.isAuthenticated = true;
                     currentSession.loginTime = Model::DateTime::now();
+                    currentSession.userRole = "user"; // All users have same role now
+                    currentSession.userId = 1; // Simple ID assignment
                     
-                    // Set user role based on user type
-                    switch (userType) {
-                        case 0: currentSession.userRole = "admin"; break;
-                        case 1: currentSession.userRole = "manager"; break;
-                        case 2: currentSession.userRole = "staff"; break;
-                        case 3: currentSession.userRole = "user"; break;
-                        case 4: currentSession.userRole = "vip"; break;
-                        default: currentSession.userRole = "user"; break;
-                    }
-                    currentSession.userId = userType; // Use userType as userId for now
-                    
-                    std::cout << "✅ Login successful! Welcome, " << username << " (" << currentSession.userRole << ")" << std::endl;
+                    UIManager::displaySuccess("Login successful! Welcome, " + username);
                     return true;
                 } else {
-                    std::cout << "❌ Invalid credentials. Please try again.\n";
+                    UIManager::displayError("Invalid credentials. Please try again.");
                 }
                 break;
             }
             case 2: { // Register
                 if (registerNewUser()) {
-                    std::cout << "✅ Registration successful! Please login with your new credentials.\n";
+                    UIManager::displaySuccess("Registration successful! Please login with your new credentials.");
                 }
                 break;
             }
             case 0: // Exit
                 return false;
             default:
-                std::cout << "❌ Invalid choice. Please select a valid option.\n";
+                UIManager::displayError("Invalid choice. Please select a valid option.");
         }
     }
 }
@@ -435,86 +377,58 @@ bool authenticateUser() {
 bool registerNewUser() {
     std::string username, password, email, firstName, lastName;
     
-    std::cout << "\n--- User Registration ---\n";
-    std::cout << "Username (or 0 to cancel): ";
+    UIManager::addSmallSpacing();
+    UIManager::printSeparator('-');
+    UIManager::printCenteredText("USER REGISTRATION");
+    UIManager::printSeparator('-');
+    
+    UIManager::displayPrompt("Username (or 0 to cancel)");
     std::getline(std::cin, username);
     if (username == "0") return false;
     
-    std::cout << "Password: ";
+    UIManager::displayPrompt("Password");
     std::getline(std::cin, password);
-    std::cout << "Email: ";
+    UIManager::displayPrompt("Email");
     std::getline(std::cin, email);
-    std::cout << "First Name: ";
+    UIManager::displayPrompt("First Name");
     std::getline(std::cin, firstName);
-    std::cout << "Last Name: ";
+    UIManager::displayPrompt("Last Name");
     std::getline(std::cin, lastName);
     
     // Create new attendee account
     auto attendee = g_attendeeModule->createAttendee(firstName + " " + lastName, email, "", Model::AttendeeType::REGULAR);
     if (attendee != nullptr) {
-        // Register user credentials (userType 3 = regular user)
-        if (g_authModule->registerUser(username, password, 3)) {
-            std::cout << "✅ Account created successfully!\n";
+        // Register user credentials
+        if (g_authModule->registerUser(username, password)) {
+            UIManager::displaySuccess("Account created successfully!");
             return true;
         } else {
-            std::cout << "❌ Failed to create user credentials (username may already exist).\n";
+            UIManager::displayError("Failed to create user credentials (username may already exist).");
             return false;
         }
     } else {
-        std::cout << "❌ Failed to create user profile.\n";
+        UIManager::displayError("Failed to create user profile.");
         return false;
     }
 }
 
 void logout() {
+    UIManager::addSmallSpacing();
     std::cout << "Logging out " << currentSession.username << "...\n";
     currentSession = UserSession(); // Reset session
-    std::cout << "✅ Logged out successfully!\n";
+    UIManager::displaySuccess("Logged out successfully!");
 }
 
 void displayMainMenu() {
-    std::cout << "\n" << std::string(60, '=') << std::endl;
-    std::cout << "           MuseIO Concert Management System" << std::endl;
-    std::cout << "               Welcome, " << currentSession.username << std::endl;
-    std::cout << std::string(60, '=') << std::endl;
-    std::cout << "1. Management Portal (Admin/Staff)" << std::endl;
-    std::cout << "2. User Portal (Concert Attendee)" << std::endl;
-    std::cout << "0. Logout" << std::endl;
-    std::cout << std::string(60, '=') << std::endl;
+    UIManager::displayMainMenu();
 }
 
 void displayManagementMenu() {
-    std::cout << "\n" << std::string(60, '=') << std::endl;
-    std::cout << "                 MANAGEMENT PORTAL" << std::endl;
-    std::cout << "                User: " << currentSession.username << std::endl;
-    std::cout << std::string(60, '=') << std::endl;
-    std::cout << "1. Concert Management" << std::endl;
-    std::cout << "2. Venue Configuration" << std::endl;
-    std::cout << "3. Performer & Crew Management" << std::endl;
-    std::cout << "4. Ticket Management & Analytics" << std::endl;
-    std::cout << "5. Payment & Financial Monitoring" << std::endl;
-    std::cout << "6. Feedback & Communication Tools" << std::endl;
-    std::cout << "7. Reports & Analytics" << std::endl;
-    std::cout << "8. System Administration" << std::endl;
-    std::cout << "9. Switch to User Portal" << std::endl;
-    std::cout << "0. Return to Main Menu" << std::endl;
-    std::cout << std::string(60, '=') << std::endl;
+    UIManager::displayManagementMenu();
 }
 
 void displayUserMenu() {
-    std::cout << "\n" << std::string(60, '=') << std::endl;
-    std::cout << "                    USER PORTAL" << std::endl;
-    std::cout << "                User: " << currentSession.username << std::endl;
-    std::cout << std::string(60, '=') << std::endl;
-    std::cout << "1. Browse Available Concerts" << std::endl;
-    std::cout << "2. Purchase Tickets" << std::endl;
-    std::cout << "3. My Tickets & Reservations" << std::endl;
-    std::cout << "4. Submit Feedback" << std::endl;
-    std::cout << "5. Browse Performers & Venues" << std::endl;
-    std::cout << "6. Account & Profile Management" << std::endl;
-    std::cout << "7. Switch to Management Portal" << std::endl;
-    std::cout << "0. Return to Main Menu" << std::endl;
-    std::cout << std::string(60, '=') << std::endl;
+    UIManager::displayUserMenu();
 }
 
 // Management Portal Functions
@@ -1972,7 +1886,7 @@ void systemAdministration() {
                         std::cout << "Admin Password: ";
                         std::getline(std::cin, password);
                         
-                        if (g_authModule->registerUser(username, password, 1)) { // 1 = Admin
+                        if (g_authModule->registerUser(username, password)) { // 1 = Admin
                             std::cout << "✅ Admin user created successfully!\n";
                         } else {
                             std::cout << "❌ Failed to create admin user.\n";
@@ -3042,24 +2956,29 @@ void manageProfile() {
 
 
 int main() {
-    std::cout << "🎵 Welcome to MuseIO Concert Management System 🎵\n\n";
+    UIManager::displayWelcomeBanner();
     
     // Initialize all modules
     if (!initializeModules()) {
-        std::cerr << "Failed to initialize system. Exiting...\n";
+        UIManager::displayError("Failed to initialize system. Exiting...");
         return -1;
     }
     
     // Initialize default users
     if (!initializeDefaultUsers()) {
-        std::cerr << "Failed to initialize default users. Exiting...\n";
+        UIManager::displayError("Failed to initialize default users. Exiting...");
         return -1;
     }
     
     // Authentication loop
     while (true) {
         if (!authenticateUser()) {
-            std::cout << "Goodbye! Thank you for using MuseIO.\n";
+            UIManager::addSectionSpacing();
+            UIManager::printSeparator('*');
+            UIManager::printCenteredText("🎵 Thank you for using MuseIO! 🎵");
+            UIManager::printCenteredText("Goodbye!");
+            UIManager::printSeparator('*');
+            UIManager::addSmallSpacing();
             break;
         }
         
@@ -3068,30 +2987,29 @@ int main() {
             displayMainMenu();
             
             int choice;
-            std::cout << "Enter your choice (0-2): ";
             
             // Robust input validation
             if (!(std::cin >> choice)) {
                 std::cin.clear();
                 std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                std::cout << "❌ Invalid input. Please enter a number.\n";
+                UIManager::displayError("Invalid input. Please enter a number.");
                 continue;
             }
 
             switch (choice) {
                 case 1: // Management Portal
-                    std::cout << "Entering Management Portal...\n";
+                    UIManager::displayInfo("Entering Management Portal...");
                     runManagementPortal();
                     break;
                 case 2: // User Portal
-                    std::cout << "Entering User Portal...\n";
+                    UIManager::displayInfo("Entering User Portal...");
                     runUserPortal();
                     break;
                 case 0: // Logout
                     logout();
                     break;
                 default:
-                    std::cout << "❌ Invalid choice. Please select a valid option.\n";
+                    UIManager::displayError("Invalid choice. Please select a valid option.");
             }
         }
     }

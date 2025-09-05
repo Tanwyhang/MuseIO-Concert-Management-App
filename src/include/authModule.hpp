@@ -237,10 +237,10 @@ public:
      * @brief Register a new user
      * @param username Username
      * @param password Password
-     * @param userType Type of user (0=regular, 1=admin, 2=staff)
+     * @param password Password
      * @return True if registration successful
      */
-    bool registerUser(const std::string& username, const std::string& password, int userType = 0) {
+    bool registerUser(const std::string& username, const std::string& password) {
         // Check if username already exists
         if (credentialMap.find(username) != credentialMap.end()) {
             return false;
@@ -254,8 +254,8 @@ public:
         unsigned char passwordHash[PASSWORD_HASH_LENGTH];
         hashPassword(password, salt, SALT_LENGTH, passwordHash, PASSWORD_HASH_LENGTH);
         
-        // Store in secure memory
-        storeCredential(username, passwordHash, salt, userType);
+        // Store in secure memory (userType = 0 for all users)
+        storeCredential(username, passwordHash, salt, 0);
         
         return true;
     }
@@ -264,13 +264,13 @@ public:
      * @brief Authenticate a user
      * @param username Username
      * @param password Password
-     * @return User type if authentication successful, -1 otherwise
+     * @return true if authentication successful, false otherwise
      */
-    int authenticateUser(const std::string& username, const std::string& password) {
+    bool authenticateUser(const std::string& username, const std::string& password) {
         // Check if username exists
         auto it = credentialMap.find(username);
         if (it == credentialMap.end()) {
-            return -1;
+            return false;
         }
         
         // Get offset in secure memory
@@ -306,16 +306,7 @@ public:
             }
         }
         
-        if (!passwordMatch) {
-            return -1;
-        }
-        
-        // Extract user type
-        const int* userTypePtr = reinterpret_cast<const int*>(
-            block + USERNAME_MAX_LENGTH + PASSWORD_HASH_LENGTH + SALT_LENGTH
-        );
-        
-        return *userTypePtr;
+        return passwordMatch;
     }
     
     /**
@@ -329,8 +320,8 @@ public:
                        const std::string& oldPassword,
                        const std::string& newPassword) {
         // First authenticate the user
-        int userType = authenticateUser(username, oldPassword);
-        if (userType < 0) {
+        bool isAuthenticated = authenticateUser(username, oldPassword);
+        if (!isAuthenticated) {
             return false;
         }
         
