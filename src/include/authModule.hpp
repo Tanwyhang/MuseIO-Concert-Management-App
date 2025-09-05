@@ -516,6 +516,23 @@ public:
     }
 
     /**
+     * @brief Get all usernames (for account viewing purposes)
+     * @return Vector of all registered usernames (no passwords exposed)
+     */
+    std::vector<std::string> getAllUsernames() {
+        std::vector<std::string> usernames;
+        
+        for (const auto& entry : credentialMap) {
+            usernames.push_back(entry.first);
+        }
+        
+        // Sort usernames alphabetically for better display
+        std::sort(usernames.begin(), usernames.end());
+        
+        return usernames;
+    }
+
+    /**
      * @brief Save credentials to a file
      * @param filePath Path to save file
      * @return True if save successful

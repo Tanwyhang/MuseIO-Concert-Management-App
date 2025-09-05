@@ -156,6 +156,7 @@ namespace UIManager {
     // Menu content with proper spacing
     const std::string AUTH_MENU = R"(1. Login
 2. Register New Account
+3. View All Accounts
 0. Exit)";
 
     const std::string MAIN_MENU_OPTIONS = R"(1. Management Portal (Admin/Staff)
@@ -208,7 +209,7 @@ namespace UIManager {
         displayLoginBanner();
         std::cout << AUTH_MENU << std::endl;
         addSmallSpacing();
-        displayChoicePrompt("0-2");
+        displayChoicePrompt("0-3");
     }
     
     inline void displayMainMenu() {

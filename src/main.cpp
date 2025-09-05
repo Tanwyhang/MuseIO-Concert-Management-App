@@ -78,6 +78,7 @@ bool registerNewUser();
 void logout();
 void displayDemoCredentialsAndTests();
 void demonstrateValidation();
+void displayAllAccounts();
 
 // Demo credentials and test plan display function
 void displayDemoCredentialsAndTests() {
@@ -327,7 +328,7 @@ bool authenticateUser() {
         displayAuthMenu();
         
         int choice;
-        std::cout << "Enter your choice (0-2): ";
+        std::cout << "Enter your choice (0-3): ";
         
         if (!(std::cin >> choice)) {
             std::cin.clear();
@@ -367,6 +368,10 @@ bool authenticateUser() {
                 if (registerNewUser()) {
                     UIManager::displaySuccess("Registration successful! Please login with your new credentials.");
                 }
+                break;
+            }
+            case 3: { // View All Accounts
+                displayAllAccounts();
                 break;
             }
             case 0: // Exit
@@ -499,6 +504,43 @@ void logout() {
     std::cout << "Logging out " << currentSession.username << "...\n";
     currentSession = UserSession(); // Reset session
     UIManager::displaySuccess("Logged out successfully!");
+}
+
+void displayAllAccounts() {
+    UIManager::addSmallSpacing();
+    UIManager::printSeparator('=');
+    UIManager::printCenteredText("ALL REGISTERED ACCOUNTS");
+    UIManager::printSeparator('=');
+    UIManager::addSmallSpacing();
+    
+    if (!g_authModule) {
+        UIManager::displayError("Authentication module not initialized.");
+        return;
+    }
+    
+    auto usernames = g_authModule->getAllUsernames();
+    
+    if (usernames.empty()) {
+        UIManager::displayInfo("No accounts found.");
+        UIManager::displayInfo("Use 'Register New Account' to create your first account.");
+    } else {
+        std::cout << "📋 Found " << usernames.size() << " registered account(s):\n\n";
+        
+        int count = 1;
+        for (const auto& username : usernames) {
+            std::cout << "  " << count << ". " << username << std::endl;
+            count++;
+        }
+        
+        UIManager::addSmallSpacing();
+        UIManager::displayInfo("Note: Passwords are not shown for security reasons.");
+        UIManager::displayInfo("Use these usernames with the 'Login' option.");
+    }
+    
+    UIManager::addSmallSpacing();
+    UIManager::printSeparator('-');
+    std::cout << "Press Enter to return to authentication menu...";
+    std::cin.get();
 }
 
 void displayMainMenu() {
