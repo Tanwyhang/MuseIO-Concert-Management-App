@@ -216,17 +216,21 @@ namespace TicketManager {
                 return "";
             }
             
-            if (ticket->qr_code.empty()) {
-                // Note: concert_id and attendee_id from weak_ptr references
-                auto attendee = ticket->attendee.lock();
-                auto concert_ticket = ticket->concert_ticket.lock();
-                int attendee_id = attendee ? attendee->id : 0;
-                int concert_id = 0; // Would need to get from concert_ticket if available
-                
-                ticket->qr_code = generateUniqueQRCode(ticket_id, concert_id, attendee_id);
-                ticket->updated_at = Model::DateTime::now();
-                saveEntities();
+            // **FIX: Return existing QR code if it exists**
+            if (!ticket->qr_code.empty()) {
+                return ticket->qr_code;
             }
+            
+            // Only generate new QR code if none exists
+            // Note: concert_id and attendee_id from weak_ptr references
+            auto attendee = ticket->attendee.lock();
+            auto concert_ticket = ticket->concert_ticket.lock();
+            int attendee_id = attendee ? attendee->id : 0;
+            int concert_id = 0; // Would need to get from concert_ticket if available
+            
+            ticket->qr_code = generateUniqueQRCode(ticket_id, concert_id, attendee_id);
+            ticket->updated_at = Model::DateTime::now();
+            saveEntities();
             
             return ticket->qr_code;
         }
@@ -239,7 +243,11 @@ namespace TicketManager {
         int validateQRCode(const std::string& qr_code) {
             auto it = std::find_if(entities.begin(), entities.end(),
                 [&qr_code](const std::shared_ptr<Model::Ticket>& ticket) {
-                    return ticket->qr_code == qr_code && ticket->status == Model::TicketStatus::SOLD;
+                    // **FIX: Accept SOLD, AVAILABLE, and CHECKED_IN tickets for validation**
+                    return ticket->qr_code == qr_code && 
+                           (ticket->status == Model::TicketStatus::SOLD ||
+                            ticket->status == Model::TicketStatus::AVAILABLE ||
+                            ticket->status == Model::TicketStatus::CHECKED_IN);
                 });
             
             return (it != entities.end()) ? (*it)->ticket_id : -1;
@@ -737,16 +745,14 @@ namespace TicketManager {
          */
         bool validateTicketCreation(int attendee_id, int concert_id, 
                                   const std::string& ticket_type) {
-            if (attendee_id <= 0 || concert_id <= 0) return false;
+            if (attendee_id < 0 || concert_id <= 0) return false;  // Allow attendee_id = 0 for system creation
             if (ticket_type.empty()) return false;
             
-            // **PRIORITY 1 FIX: Enhanced validation with concert existence check**
-            // Basic validation first
-            if (!areTicketsOnSale(concert_id)) {
-                return false;
-            }
+            // **PRIORITY 1 FIX: Allow ticket creation even when no tickets exist yet**
+            // Only check if concert_id is valid (> 0)
+            // The external concert validation will handle concert existence
             
-            return true; // Will be enhanced by external concert validation
+            return true; // Basic validation passed, external validation handles concert existence
         }
         
         /**

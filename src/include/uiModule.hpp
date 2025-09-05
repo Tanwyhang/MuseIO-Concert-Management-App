@@ -146,7 +146,7 @@ namespace UIManager {
     const std::string APP_BANNER = R"(
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║                       🎵 MUSEIO CONCERT MANAGEMENT 🎵                       ║
+║                       🎵 MUSEIO CONCERT MANAGEMENT 🎵                        ║
 ║                         Your Complete Concert Solution                       ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -185,6 +185,25 @@ namespace UIManager {
     // Menu aliases for backward compatibility
     const std::string USER_MENU = USER_MENU_OPTIONS;
     const std::string MANAGEMENT_MENU = MANAGEMENT_MENU_OPTIONS;
+    
+    // Demo credentials display string
+    const std::string DEMO_CREDENTIALS = R"(
+═══════════════════════════════════════════════════════════════════════════════
+                              DEMO LOGIN CREDENTIALS
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────┬─────────────┬──────────────────┐
+│ Username    │ Password    │ Role             │
+├─────────────┼─────────────┼──────────────────┤
+│ admin       │ admin123    │ Administrator    │
+│ manager1    │ manager123  │ Concert Manager  │
+│ staff1      │ staff123    │ Staff Member     │
+│ user1       │ user123     │ Regular User     │
+│ vip1        │ vip123      │ VIP User         │
+└─────────────┴─────────────┴──────────────────┘
+
+Note: Use these credentials to test different user roles and permissions.
+)";
     
     // Default user credentials table
     inline void displayDefaultCredentials() {
