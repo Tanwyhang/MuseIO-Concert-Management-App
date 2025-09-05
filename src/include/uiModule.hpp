@@ -155,33 +155,59 @@ namespace UIManager {
     )";
 
     // Menu content with proper spacing
-    const std::string AUTH_MENU = R"(1. Login
-2. Register New Account
-3. View All Accounts
-0. Exit)";
+    const std::string AUTH_MENU = R"(
+┌─────────────────────────────┐
+│          AUTH MENU          │
+├─────────────────────────────┤
+│ 1. Login                    │
+│ 2. Register New Account     │
+│ 3. View All Accounts        │
+│ 0. Exit                     │
+└─────────────────────────────┘
+)";
 
-    const std::string MAIN_MENU_OPTIONS = R"(1. Management Portal (Admin/Staff)
-2. User Portal (General Access)
-0. Logout)";
+    const std::string MAIN_MENU_OPTIONS = R"(
+┌─────────────────────────────┐
+│         MAIN MENU           │
+├─────────────────────────────┤
+│ 1. Management Portal        │
+│    (Admin/Staff)            │
+│ 2. User Portal              │
+│    (General Access)         │
+│ 0. Logout                   │
+└─────────────────────────────┘
+)";
 
-    const std::string MANAGEMENT_MENU_OPTIONS = R"(1. Concert Management
-2. Venue Management  
-3. Crew Management
-4. Ticket Management
-5. Payment Management
-6. Feedback Management
-7. Reports & Analytics
-8. Communication Tools
-9. System Settings
-10. Input Validation Demo
-0. Back to Main Menu)";
+    const std::string MANAGEMENT_MENU_OPTIONS = R"(
+┌─────────────────────────────┐
+│    MANAGEMENT MENU          │
+├─────────────────────────────┤
+│ 1. Concert Management       │
+│ 2. Venue Management         │
+│ 3. Crew Management          │
+│ 4. Ticket Management        │
+│ 5. Payment Management       │
+│ 6. Feedback Management      │
+│ 7. Reports & Analytics      │
+│ 8. Communication Tools      │
+│ 9. System Settings          │
+│ 10. Input Validation Demo   │
+│ 0. Back to Main Menu        │
+└─────────────────────────────┘
+)";
 
-    const std::string USER_MENU_OPTIONS = R"(1. Browse Concerts
-2. Purchase Tickets
-3. View My Tickets
-4. Submit Feedback
-5. Concert Information
-0. Back to Main Menu)";
+    const std::string USER_MENU_OPTIONS = R"(
+┌─────────────────────────────┐
+│       USER MENU             │
+├─────────────────────────────┤
+│ 1. Browse Concerts          │
+│ 2. Purchase Tickets         │
+│ 3. View My Tickets          │
+│ 4. Submit Feedback          │
+│ 5. Concert Information      │
+│ 0. Back to Main Menu        │
+└─────────────────────────────┘
+)";
     
     // Menu aliases for backward compatibility
     const std::string USER_MENU = USER_MENU_OPTIONS;
@@ -193,15 +219,15 @@ namespace UIManager {
                               DEMO LOGIN CREDENTIALS
 ═══════════════════════════════════════════════════════════════════════════════
 
-┌─────────────┬─────────────┬──────────────────┐
-│ Username    │ Password    │ Role             │
-├─────────────┼─────────────┼──────────────────┤
-│ admin       │ admin123    │ Administrator    │
-│ manager1    │ manager123  │ Concert Manager  │
-│ staff1      │ staff123    │ Staff Member     │
-│ user1       │ user123     │ Regular User     │
-│ vip1        │ vip123      │ VIP User         │
-└─────────────┴─────────────┴──────────────────┘
+┌─────────────┬─────────────┐
+│ Username    │ Password    │
+├─────────────┼─────────────┤
+│ admin       │ admin123    │
+│ manager1    │ manager123  │
+│ staff1      │ staff123    │
+│ user1       │ user123     │
+│ vip1        │ vip123      │
+└─────────────┴─────────────┘
 
 Note: Use these credentials to test different user roles and permissions.
 )";
@@ -212,15 +238,15 @@ Note: Use these credentials to test different user roles and permissions.
         printSeparator('-');
         printCenteredText("DEFAULT LOGIN CREDENTIALS");
         printSeparator('-');
-        std::cout << "┌─────────────┬─────────────┬──────────────────┐\n";
-        std::cout << "│ Username    │ Password    │ Role             │\n";
-        std::cout << "├─────────────┼─────────────┼──────────────────┤\n";
-        std::cout << "│ admin       │ admin123    │ Administrator    │\n";
-        std::cout << "│ manager1    │ manager123  │ Concert Manager  │\n";
-        std::cout << "│ staff1      │ staff123    │ Staff Member     │\n";
-        std::cout << "│ user1       │ user123     │ Regular User     │\n";
-        std::cout << "│ vip1        │ vip123      │ VIP User         │\n";
-        std::cout << "└─────────────┴─────────────┴──────────────────┘\n";
+        std::cout << "┌─────────────┬────────────┐\n";
+        std::cout << "│ Username    │ Password   │\n";
+        std::cout << "├─────────────┼────────────┤\n";
+        std::cout << "│ admin       │ admin123   │\n";
+        std::cout << "│ manager1    │ manager123 │\n";
+        std::cout << "│ staff1      │ staff123   │\n";
+        std::cout << "│ user1       │ user123    │\n";
+        std::cout << "│ vip1        │ vip123     │\n";
+        std::cout << "└─────────────┴────────────┘\n";
         addSmallSpacing();
     }
     
