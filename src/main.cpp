@@ -697,9 +697,14 @@ void manageConcerts() {
                     concertDateTime, concertDateTime);
                 
                 if (concert != nullptr) {
+                    // **NEW: Create ticket inventory for the concert**
+                    int venueCapacity = venue ? venue->capacity : 500; // Use venue capacity or default
+                    auto ticketIds = g_ticketModule->createTicketInventory(concert->id, venueCapacity, "Regular", venueCapacity);
+                    
                     UIManager::displaySuccess("Concert created successfully! ID: " + std::to_string(concert->id));
                     UIManager::displayInfo("Date/Time: " + concertDate + " at " + concertTime);
                     UIManager::displayInfo("Venue: " + venue->name + " (ID: " + std::to_string(venueId) + ")");
+                    UIManager::displayInfo("Ticket Inventory: " + std::to_string(ticketIds.size()) + " tickets created");
                 } else {
                     UIManager::displayError("Failed to create concert. Please try again.");
                 }
@@ -829,10 +834,12 @@ void manageTickets() {
         std::cout << "4. Validate Ticket-Concert Relationships\n";
         std::cout << "5. QR Code Management\n";
         std::cout << "6. Ticket Status Updates\n";
+        std::cout << "7. Simulate Ticket Purchases\n";
+        std::cout << "8. 🆕 RESET TICKET INVENTORY (Create Fresh AVAILABLE Tickets)\n";
         std::cout << "0. Back to Management Portal\n";
         
         int choice;
-        std::cout << "Enter choice (0-6): ";
+        std::cout << "Enter choice (0-8): ";
         if (!(std::cin >> choice)) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -866,22 +873,32 @@ void manageTickets() {
                     break;
                 }
                 
-                // Use enhanced ticket creation with validation
-                std::vector<int> ticketIds;
-                for (int i = 0; i < quantity; i++) {
-                    // Create ticket without attendee initially (will be assigned during purchase)
-                    int ticketId = g_ticketModule->createTicketSafe(0, concertId, ticketType, concertExists);
-                    if (ticketId > 0) {
-                        ticketIds.push_back(ticketId);
+                // **NEW APPROACH: Create inventory (AVAILABLE tickets) instead of SOLD tickets**
+                std::cout << "Creating ticket inventory for concert...\n";
+                auto inventoryIds = g_ticketModule->createTicketInventory(concertId, quantity, ticketType, 1000);
+                
+                std::cout << "✅ Created " << inventoryIds.size() << " AVAILABLE tickets successfully!\n";
+                std::cout << "First 20 Ticket IDs: ";
+                for (size_t i = 0; i < std::min(inventoryIds.size(), static_cast<size_t>(20)); i++) {
+                    std::cout << inventoryIds[i] << " ";
+                }
+                if (inventoryIds.size() > 20) {
+                    std::cout << "... (and " << (inventoryIds.size() - 20) << " more)";
+                }
+                std::cout << std::endl;
+                
+                // **DEBUG: Show sample QR code format**
+                if (!inventoryIds.empty()) {
+                    auto sampleTicket = g_ticketModule->getTicketById(inventoryIds[0]);
+                    if (sampleTicket) {
+                        std::cout << "DEBUG: Sample QR code: " << sampleTicket->qr_code << std::endl;
+                        std::cout << "DEBUG: Sample ticket status: " << (int)sampleTicket->status << std::endl;
                     }
                 }
                 
-                std::cout << "✅ Created " << ticketIds.size() << " tickets successfully!\n";
-                std::cout << "Ticket IDs: ";
-                for (int id : ticketIds) {
-                    std::cout << id << " ";
-                }
-                std::cout << std::endl;
+                // Show availability
+                int availableCount = g_ticketModule->getAvailableTicketCount(concertId);
+                std::cout << "Current available tickets for concert " << concertId << ": " << availableCount << std::endl;
                 break;
             }
             case 2: { // Ticket Sales Statistics
@@ -925,18 +942,37 @@ void manageTickets() {
                 std::cout << "\n--- Ticket Availability Summary ---\n";
                 
                 for (const auto& concert : concerts) {
-                    if (concert->event_status == Model::EventStatus::SCHEDULED || 
-                        concert->event_status == Model::EventStatus::SOLDOUT) {
-                        auto concertTickets = g_ticketModule->getTicketsByConcert(concert->id);
-                        int available = 0;
-                        for (const auto& ticket : concertTickets) {
-                            if (ticket->status == Model::TicketStatus::AVAILABLE) {
-                                available++;
-                            }
-                        }
-                        std::cout << concert->name << " (ID: " << concert->id 
-                                  << ") - Available: " << available << " tickets\n";
+                    // **DEBUG: Show ALL concerts regardless of status**
+                    // std::cout << "DEBUG: Concert " << concert->id << " (" << concert->name << ") - Status: ";
+                    switch (concert->event_status) {
+                        case Model::EventStatus::SCHEDULED: std::cout << "SCHEDULED"; break;
+                        case Model::EventStatus::CANCELLED: std::cout << "CANCELLED"; break;
+                        case Model::EventStatus::POSTPONED: std::cout << "POSTPONED"; break;
+                        case Model::EventStatus::COMPLETED: std::cout << "COMPLETED"; break;
+                        case Model::EventStatus::SOLDOUT: std::cout << "SOLDOUT"; break;
                     }
+                    std::cout << std::endl;
+                    
+                    // Show availability for ALL concerts (remove status filter for debugging)
+                    auto concertTickets = g_ticketModule->getTicketsByConcert(concert->id);
+                    int available = 0;
+                    // std::cout << "DEBUG: Found " << concertTickets.size() << " tickets for concert " << concert->id << std::endl;
+                    
+                    for (const auto& ticket : concertTickets) {
+                        if (ticket->status == Model::TicketStatus::AVAILABLE) {
+                            available++;
+                        }
+                        // DEBUG: Show first few ticket details
+                        /*
+                        if (available < 3) {
+                            std::cout << "DEBUG: Ticket " << ticket->ticket_id << " QR:" << ticket->qr_code 
+                                      << " Status:" << (int)ticket->status << std::endl;
+                        }
+                        */
+                    }
+                    
+                    std::cout << concert->name << " (ID: " << concert->id 
+                              << ") - Available: " << available << " tickets\n";
                 }
                 break;
             }
@@ -1015,6 +1051,97 @@ void manageTickets() {
                     std::cout << "✅ Ticket status updated successfully!\n";
                 } else {
                     std::cout << "❌ Failed to update ticket status.\n";
+                }
+                break;
+            }
+            case 7: { // Simulate Ticket Purchases
+                int concertId, quantity;
+                std::cout << "Concert ID for purchases (or 0 to cancel): ";
+                std::cin >> concertId;
+                if (concertId == 0) break;
+                
+                std::cout << "Number of tickets to purchase (or 0 to cancel): ";
+                std::cin >> quantity;
+                if (quantity == 0) break;
+                
+                auto concert = g_concertModule->getConcertById(concertId);
+                if (!concert) {
+                    std::cout << "❌ Concert not found.\n";
+                    break;
+                }
+                
+                int availableBefore = g_ticketModule->getAvailableTicketCount(concertId);
+                std::cout << "Available tickets before purchase: " << availableBefore << std::endl;
+                
+                if (availableBefore < quantity) {
+                    std::cout << "❌ Not enough available tickets! Only " << availableBefore << " available.\n";
+                    break;
+                }
+                
+                // Simulate purchasing tickets
+                std::vector<int> purchasedIds;
+                for (int i = 0; i < quantity; i++) {
+                    int purchasedTicket = g_ticketModule->purchaseAvailableTicket(i + 1, concertId, "Regular");
+                    if (purchasedTicket > 0) {
+                        purchasedIds.push_back(purchasedTicket);
+                    }
+                }
+                
+                int availableAfter = g_ticketModule->getAvailableTicketCount(concertId);
+                std::cout << "✅ Successfully purchased " << purchasedIds.size() << " tickets!\n";
+                std::cout << "Available tickets after purchase: " << availableAfter << std::endl;
+                std::cout << "First 10 purchased ticket IDs: ";
+                for (size_t i = 0; i < std::min(purchasedIds.size(), static_cast<size_t>(10)); i++) {
+                    std::cout << purchasedIds[i] << " ";
+                }
+                if (purchasedIds.size() > 10) {
+                    std::cout << "... (and " << (purchasedIds.size() - 10) << " more)";
+                }
+                std::cout << std::endl;
+                break;
+            }
+            case 8: { // 🆕 RESET TICKET INVENTORY - Create Fresh AVAILABLE Tickets
+                int concertId, quantity;
+                std::cout << "🆕 RESET TICKET INVENTORY - This will create fresh AVAILABLE tickets\n";
+                std::cout << "Concert ID for fresh inventory (or 0 to cancel): ";
+                std::cin >> concertId;
+                if (concertId == 0) break;
+                
+                std::cout << "Number of fresh AVAILABLE tickets to create (or 0 to cancel): ";
+                std::cin >> quantity;
+                if (quantity == 0) break;
+                
+                auto concert = g_concertModule->getConcertById(concertId);
+                if (!concert) {
+                    std::cout << "❌ Concert not found.\n";
+                    break;
+                }
+                
+                std::cout << "Creating " << quantity << " fresh AVAILABLE tickets for concert " << concertId << "...\n";
+                
+                // Create fresh inventory with explicit AVAILABLE status
+                auto freshTicketIds = g_ticketModule->createTicketInventory(concertId, quantity, "Regular", 1000);
+                
+                std::cout << "✅ Created " << freshTicketIds.size() << " fresh AVAILABLE tickets!\n";
+                
+                // Immediately check availability
+                int availableCount = g_ticketModule->getAvailableTicketCount(concertId);
+                std::cout << "Available tickets for concert " << concertId << ": " << availableCount << std::endl;
+                
+                // Show sample tickets with status
+                std::cout << "Sample fresh ticket IDs: ";
+                for (size_t i = 0; i < std::min(freshTicketIds.size(), static_cast<size_t>(10)); i++) {
+                    auto ticket = g_ticketModule->getTicketById(freshTicketIds[i]);
+                    if (ticket) {
+                        std::cout << "[ID:" << freshTicketIds[i] << ",Status:" << (int)ticket->status << "] ";
+                    }
+                }
+                std::cout << std::endl;
+                
+                if (availableCount > 0) {
+                    std::cout << "🎉 SUCCESS! Fresh AVAILABLE tickets created successfully!\n";
+                } else {
+                    std::cout << "⚠️ WARNING: Available count is still 0 - there may be a data persistence issue.\n";
                 }
                 break;
             }

@@ -397,9 +397,13 @@ private:
             concertDateTime, concertDateTime);
         
         if (concert) {
+            // **NEW: Create ticket inventory immediately after concert creation**
+            auto inventoryIds = g_ticketModule->createTicketInventory(concert->id, 500, "Regular", 500);
+            
             UIManager::displaySuccess("Concert created successfully! ID: " + std::to_string(concert->id));
             UIManager::displayInfo("Date/Time: 2025-12-31 at 19:30");
             UIManager::displayInfo("Venue: Concert Hall (ID: 1)");
+            UIManager::displayInfo("Ticket Inventory: " + std::to_string(inventoryIds.size()) + " tickets created");
         } else {
             UIManager::displayError("Failed to create concert. Please try again.");
         }
@@ -787,24 +791,46 @@ private:
         bool concertExists = (concert != nullptr);
         
         if (concertExists) {
-            std::vector<int> ticketIds;
+            // **NEW APPROACH: Create inventory first, then simulate purchases**
+            
+            // Step 1: Check if inventory already exists
+            int availableCount = g_ticketModule->getAvailableTicketCount(1);
+            showOutput("Current available tickets: " + std::to_string(availableCount));
+            
+            // Step 2: Create inventory if needed (for demonstration)
+            if (availableCount < 100) {
+                showOutput("Creating ticket inventory for concert...");
+                auto inventoryIds = g_ticketModule->createTicketInventory(1, 500, "REGULAR", 500);
+                showOutput("✅ Created " + std::to_string(inventoryIds.size()) + " tickets in inventory!");
+                availableCount = g_ticketModule->getAvailableTicketCount(1);
+                showOutput("Updated available tickets: " + std::to_string(availableCount));
+            }
+            
+            // Step 3: Simulate purchasing 100 tickets from inventory
+            showOutput("Simulating ticket purchases...");
+            std::vector<int> purchasedIds;
             for (int i = 0; i < 100; i++) {
-                int ticketId = g_ticketModule->createTicketSafe(0, 1, "REGULAR", concertExists);
-                if (ticketId > 0) {
-                    ticketIds.push_back(ticketId);
+                int purchasedTicket = g_ticketModule->purchaseAvailableTicket(i + 1, 1, "REGULAR");
+                if (purchasedTicket > 0) {
+                    purchasedIds.push_back(purchasedTicket);
                 }
             }
             
-            showOutput("✅ Created " + std::to_string(ticketIds.size()) + " tickets successfully!");
-            showOutput("Ticket IDs: ");
+            showOutput("✅ Purchased " + std::to_string(purchasedIds.size()) + " tickets successfully!");
+            showOutput("Purchased Ticket IDs: ");
             std::string idList;
-            for (size_t i = 0; i < std::min(ticketIds.size(), static_cast<size_t>(10)); i++) {
-                idList += std::to_string(ticketIds[i]) + " ";
+            for (size_t i = 0; i < std::min(purchasedIds.size(), static_cast<size_t>(10)); i++) {
+                idList += std::to_string(purchasedIds[i]) + " ";
             }
-            if (ticketIds.size() > 10) {
-                idList += "... (and " + std::to_string(ticketIds.size() - 10) + " more)";
+            if (purchasedIds.size() > 10) {
+                idList += "... (and " + std::to_string(purchasedIds.size() - 10) + " more)";
             }
             showOutput(idList);
+            
+            // Show final availability
+            int finalAvailable = g_ticketModule->getAvailableTicketCount(1);
+            showOutput("Remaining available tickets: " + std::to_string(finalAvailable));
+            
         } else {
             showOutput("❌ Concert not found! Cannot create tickets for non-existent concert.");
         }

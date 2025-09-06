@@ -57,6 +57,13 @@ namespace TicketManager {
                 return -1;
             }
 
+            // **NEW LOGIC: Try to purchase an available ticket first**
+            int purchased_ticket = purchaseAvailableTicket(attendee_id, concert_id, ticket_type);
+            if (purchased_ticket != -1) {
+                return purchased_ticket; // Successfully purchased available ticket
+            }
+
+            // **FALLBACK: Create new sold ticket if no inventory available**
             auto ticket = std::make_shared<Model::Ticket>();
             ticket->ticket_id = generateNewId();
             ticket->status = Model::TicketStatus::SOLD;
@@ -160,6 +167,97 @@ namespace TicketManager {
             }
             
             return ticket_ids;
+        }
+
+        /**
+         * @brief Create ticket inventory for a concert (AVAILABLE tickets)
+         * @param concert_id ID of the concert
+         * @param quantity Number of tickets to create for inventory
+         * @param ticket_type Type of tickets (VIP, Regular, etc.)
+         * @param venue_capacity Maximum venue capacity (default: 500)
+         * @return Vector of ticket IDs created for inventory
+         */
+        std::vector<int> createTicketInventory(int concert_id, int quantity, 
+                                             const std::string& ticket_type = "Regular", 
+                                             int venue_capacity = 500) {
+            std::vector<int> ticket_ids;
+            
+            // Limit quantity to venue capacity
+            int actual_quantity = std::min(quantity, venue_capacity);
+            
+            for (int i = 0; i < actual_quantity; ++i) {
+                auto ticket = std::make_shared<Model::Ticket>();
+                ticket->ticket_id = generateNewId();
+                ticket->status = Model::TicketStatus::AVAILABLE;  // ✅ Create as AVAILABLE
+                ticket->qr_code = generateUniqueQRCode(ticket->ticket_id, concert_id, 0); // No attendee yet
+                ticket->created_at = Model::DateTime::now();
+                ticket->updated_at = Model::DateTime::now();
+                
+                // **DEBUG: Verify ticket status immediately after creation**
+                std::cout << "DEBUG: Created ticket " << ticket->ticket_id 
+                          << " with status " << (int)ticket->status 
+                          << " (0=AVAILABLE, 1=SOLD)" << std::endl;
+                
+                // **FIX: Store concert_id in QR code for association tracking**
+                // Since Model::Ticket doesn't have concert_id field, we'll track it in QR code
+                // QR format: TKT[id]C[concert_id]A[attendee_id]X[random]
+                
+                entities.push_back(ticket);
+                ticket_ids.push_back(ticket->ticket_id);
+                
+                logTicketTransaction(*ticket, "INVENTORY_CREATED");
+            }
+            
+            saveEntities();
+            return ticket_ids;
+        }
+
+        /**
+         * @brief Purchase an available ticket (convert AVAILABLE → SOLD)
+         * @param attendee_id ID of the attendee purchasing the ticket
+         * @param concert_id ID of the concert
+         * @param ticket_type Type of ticket to purchase
+         * @return Ticket ID if successful, -1 if no available tickets
+         */
+        int purchaseAvailableTicket(int attendee_id, int concert_id, const std::string& ticket_type) {
+            // Find an available ticket for this specific concert
+            auto it = std::find_if(entities.begin(), entities.end(),
+                [concert_id](const std::shared_ptr<Model::Ticket>& ticket) {
+                    if (ticket->status != Model::TicketStatus::AVAILABLE) {
+                        return false;
+                    }
+                    
+                    // **FIX: Parse concert_id from QR code to match specific concert**
+                    std::string qr = ticket->qr_code;
+                    size_t c_pos = qr.find("C");
+                    size_t a_pos = qr.find("A");
+                    
+                    if (c_pos != std::string::npos && a_pos != std::string::npos && c_pos < a_pos) {
+                        try {
+                            int ticket_concert_id = std::stoi(qr.substr(c_pos + 1, a_pos - c_pos - 1));
+                            return ticket_concert_id == concert_id;
+                        } catch (...) {
+                            return false; // Invalid QR format
+                        }
+                    }
+                    return false; // Invalid QR format
+                });
+            
+            if (it == entities.end()) {
+                return -1; // No available tickets for this concert
+            }
+            
+            auto ticket = *it;
+            
+            // Convert to sold ticket
+            ticket->status = Model::TicketStatus::SOLD;
+            ticket->qr_code = generateUniqueQRCode(ticket->ticket_id, concert_id, attendee_id);
+            ticket->updated_at = Model::DateTime::now();
+            
+            saveEntities();
+            logTicketTransaction(*ticket, "PURCHASED");
+            
+            return ticket->ticket_id;
         }
 
         /**
@@ -364,10 +462,21 @@ namespace TicketManager {
             std::vector<std::shared_ptr<Model::Ticket>> result;
             std::copy_if(entities.begin(), entities.end(), std::back_inserter(result),
                 [concert_id](const std::shared_ptr<Model::Ticket>& ticket) {
-                    auto concert_ticket = ticket->concert_ticket.lock();
-                    // Note: Would need to access concert ID through concert_ticket relation
-                    // For now, return all tickets as we can't filter by concert_id
-                    return true; // Simplified since concert_id field doesn't exist
+                    // **FIX: Parse concert_id from QR code since Model::Ticket doesn't have concert_id field**
+                    // QR format: TKT[id]C[concert_id]A[attendee_id]X[random]
+                    std::string qr = ticket->qr_code;
+                    size_t c_pos = qr.find("C");
+                    size_t a_pos = qr.find("A");
+                    
+                    if (c_pos != std::string::npos && a_pos != std::string::npos && c_pos < a_pos) {
+                        try {
+                            int ticket_concert_id = std::stoi(qr.substr(c_pos + 1, a_pos - c_pos - 1));
+                            return ticket_concert_id == concert_id;
+                        } catch (...) {
+                            return false; // Invalid QR format
+                        }
+                    }
+                    return false; // Invalid QR format
                 });
             return result;
         }
@@ -380,17 +489,17 @@ namespace TicketManager {
          * @return Number of available tickets
          */
         int getAvailableTicketCount(int concert_id) {
-            // Simulate available tickets (would normally check venue capacity vs sold tickets)
-            auto sold_tickets = getTicketsByConcert(concert_id);
-            int sold_count = 0;
-            for (const auto& ticket : sold_tickets) {
-                if (ticket->status != Model::TicketStatus::CANCELLED) {
-                    sold_count++;
+            // **FIX: Count actual AVAILABLE tickets for this concert**
+            auto concert_tickets = getTicketsByConcert(concert_id);
+            int available_count = 0;
+            
+            for (const auto& ticket : concert_tickets) {
+                if (ticket->status == Model::TicketStatus::AVAILABLE) {
+                    available_count++;
                 }
             }
             
-            int total_capacity = 500; // Default venue capacity
-            return std::max(0, total_capacity - sold_count);
+            return available_count;
         }
 
         /**
@@ -646,6 +755,13 @@ namespace TicketManager {
                 file.read(&ticket->updated_at.iso8601String[0], len);
                 
                 entities.push_back(ticket);
+                
+                // **DEBUG: Check status of loaded tickets**
+                if (i < 5) { // Only show first 5 for brevity
+                    std::cout << "DEBUG: Loaded ticket " << ticket->ticket_id 
+                              << " with status " << (int)ticket->status 
+                              << " QR: " << ticket->qr_code << std::endl;
+                }
             }
             file.close();
         }
@@ -819,5 +935,39 @@ namespace TicketManager {
     std::vector<int> createMultipleTicketsWithValidation(int attendee_id, int concert_id, 
                                                        int quantity, const std::string& ticket_type, bool concertExists) {
         return getModule().createMultipleTicketsSafe(attendee_id, concert_id, quantity, ticket_type, concertExists);
+    }
+    
+    /**
+     * @brief Create ticket inventory for a concert
+     * @param concert_id Concert ID
+     * @param quantity Number of tickets to create
+     * @param ticket_type Type of tickets
+     * @param venue_capacity Maximum venue capacity
+     * @return Vector of ticket IDs created
+     */
+    std::vector<int> createInventory(int concert_id, int quantity, 
+                                   const std::string& ticket_type = "Regular", 
+                                   int venue_capacity = 500) {
+        return getModule().createTicketInventory(concert_id, quantity, ticket_type, venue_capacity);
+    }
+    
+    /**
+     * @brief Purchase an available ticket
+     * @param attendee_id Attendee ID
+     * @param concert_id Concert ID
+     * @param ticket_type Ticket type
+     * @return Ticket ID if successful, -1 if failed
+     */
+    int purchaseTicket(int attendee_id, int concert_id, const std::string& ticket_type = "Regular") {
+        return getModule().purchaseAvailableTicket(attendee_id, concert_id, ticket_type);
+    }
+    
+    /**
+     * @brief Get available ticket count for a concert
+     * @param concert_id Concert ID
+     * @return Number of available tickets
+     */
+    int getAvailableCount(int concert_id) {
+        return getModule().getAvailableTicketCount(concert_id);
     }
 }
