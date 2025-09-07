@@ -193,12 +193,7 @@ namespace TicketManager {
                 ticket->created_at = Model::DateTime::now();
                 ticket->updated_at = Model::DateTime::now();
                 
-                // **DEBUG: Verify ticket status immediately after creation**
-                std::cout << "DEBUG: Created ticket " << ticket->ticket_id 
-                          << " with status " << (int)ticket->status 
-                          << " (0=AVAILABLE, 1=SOLD)" << std::endl;
-                
-                // **FIX: Store concert_id in QR code for association tracking**
+                // Store concert_id in QR code for association tracking
                 // Since Model::Ticket doesn't have concert_id field, we'll track it in QR code
                 // QR format: TKT[id]C[concert_id]A[attendee_id]X[random]
                 
