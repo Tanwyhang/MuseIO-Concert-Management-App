@@ -71,7 +71,7 @@ namespace UIManager {
 │ 2. Purchase Tickets         │
 │ 3. View My Tickets          │
 │ 4. Submit Feedback          │
-│ 5. Concert Information      │
+│ 5. Performers & Venues      │
 │ 0. Back to Main Menu        │
 └─────────────────────────────┘
 )";

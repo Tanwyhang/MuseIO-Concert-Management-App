@@ -79,6 +79,7 @@ void logout();
 void displayDemoCredentialsAndTests();
 void demonstrateValidation();
 void displayAllAccounts();
+void showAnalyticsDashboard();
 
 // Demo credentials and test plan display function
 void displayDemoCredentialsAndTests() {
@@ -328,6 +329,7 @@ bool authenticateUser() {
         displayAuthMenu();
         
         int choice;
+        std::cout << "Enter your choice (0-3): ";
         
         if (!(std::cin >> choice)) {
             std::cin.clear();
@@ -835,11 +837,10 @@ void manageTickets() {
         std::cout << "6. Ticket Status Updates\n";
         std::cout << "7. Simulate Ticket Purchases\n";
         std::cout << "8. 🆕 RESET TICKET INVENTORY (Create Fresh AVAILABLE Tickets)\n";
-        std::cout << "9. 🔍 DIAGNOSTIC: Debug Ticket Data\n";
         std::cout << "0. Back to Management Portal\n";
         
         int choice;
-        std::cout << "Enter choice (0-9): ";
+        std::cout << "Enter choice (0-8): ";
         if (!(std::cin >> choice)) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -874,64 +875,31 @@ void manageTickets() {
                 }
                 
                 // **NEW APPROACH: Create inventory (AVAILABLE tickets) instead of SOLD tickets**
-                std::cout << "Creating ticket inventory for concert " << concertId << "...\n";
+                std::cout << "Creating ticket inventory for concert...\n";
                 auto inventoryIds = g_ticketModule->createTicketInventory(concertId, quantity, ticketType, 1000);
                 
                 std::cout << "✅ Created " << inventoryIds.size() << " AVAILABLE tickets successfully!\n";
-                std::cout << "First 5 Ticket IDs: ";
-                for (size_t i = 0; i < std::min(inventoryIds.size(), static_cast<size_t>(5)); i++) {
+                std::cout << "First 20 Ticket IDs: ";
+                for (size_t i = 0; i < std::min(inventoryIds.size(), static_cast<size_t>(20)); i++) {
                     std::cout << inventoryIds[i] << " ";
                 }
-                if (inventoryIds.size() > 5) {
-                    std::cout << "... (and " << (inventoryIds.size() - 5) << " more)";
+                if (inventoryIds.size() > 20) {
+                    std::cout << "... (and " << (inventoryIds.size() - 20) << " more)";
                 }
                 std::cout << std::endl;
                 
-                // **ENHANCED DEBUG: Verify ticket creation immediately**
+                // **DEBUG: Show sample QR code format**
                 if (!inventoryIds.empty()) {
                     auto sampleTicket = g_ticketModule->getTicketById(inventoryIds[0]);
                     if (sampleTicket) {
-                        std::cout << "✅ Sample ticket verification:\n";
-                        std::cout << "   - Ticket ID: " << sampleTicket->ticket_id << std::endl;
-                        std::cout << "   - QR Code: " << sampleTicket->qr_code << std::endl;
-                        std::cout << "   - Status: " << (int)sampleTicket->status << " (0=AVAILABLE, 1=SOLD)" << std::endl;
-                        
-                        // Test QR code parsing
-                        std::string qr = sampleTicket->qr_code;
-                        size_t c_pos = qr.find("C");
-                        size_t a_pos = qr.find("A");
-                        if (c_pos != std::string::npos && a_pos != std::string::npos && c_pos < a_pos) {
-                            try {
-                                int parsed_concert_id = std::stoi(qr.substr(c_pos + 1, a_pos - c_pos - 1));
-                                std::cout << "   - Parsed Concert ID: " << parsed_concert_id << " (should match " << concertId << ")" << std::endl;
-                                if (parsed_concert_id == concertId) {
-                                    std::cout << "   - ✅ QR parsing: SUCCESS" << std::endl;
-                                } else {
-                                    std::cout << "   - ❌ QR parsing: MISMATCH!" << std::endl;
-                                }
-                            } catch (...) {
-                                std::cout << "   - ❌ QR parsing: ERROR!" << std::endl;
-                            }
-                        } else {
-                            std::cout << "   - ❌ QR parsing: INVALID FORMAT!" << std::endl;
-                        }
+                        std::cout << "DEBUG: Sample QR code: " << sampleTicket->qr_code << std::endl;
+                        std::cout << "DEBUG: Sample ticket status: " << (int)sampleTicket->status << std::endl;
                     }
                 }
                 
-                // **IMMEDIATE VERIFICATION: Check availability right after creation**
+                // Show availability
                 int availableCount = g_ticketModule->getAvailableTicketCount(concertId);
-                std::cout << "✅ IMMEDIATE CHECK - Available tickets for concert " << concertId << ": " << availableCount << std::endl;
-                
-                // **DETAILED VERIFICATION: Get all tickets for this concert and count them**
-                auto allConcertTickets = g_ticketModule->getTicketsByConcert(concertId);
-                std::cout << "✅ DETAILED CHECK - Total tickets found for concert " << concertId << ": " << allConcertTickets.size() << std::endl;
-                
-                int availableDebug = 0, soldDebug = 0;
-                for (const auto& ticket : allConcertTickets) {
-                    if (ticket->status == Model::TicketStatus::AVAILABLE) availableDebug++;
-                    else if (ticket->status == Model::TicketStatus::SOLD) soldDebug++;
-                }
-                std::cout << "   - Available: " << availableDebug << ", Sold: " << soldDebug << std::endl;
+                std::cout << "Current available tickets for concert " << concertId << ": " << availableCount << std::endl;
                 break;
             }
             case 2: { // Ticket Sales Statistics
@@ -975,8 +943,8 @@ void manageTickets() {
                 std::cout << "\n--- Ticket Availability Summary ---\n";
                 
                 for (const auto& concert : concerts) {
-                    std::cout << "\nConcert: " << concert->name << " (ID: " << concert->id << ")\n";
-                    std::cout << "Status: ";
+                    // **DEBUG: Show ALL concerts regardless of status**
+                    // std::cout << "DEBUG: Concert " << concert->id << " (" << concert->name << ") - Status: ";
                     switch (concert->event_status) {
                         case Model::EventStatus::SCHEDULED: std::cout << "SCHEDULED"; break;
                         case Model::EventStatus::CANCELLED: std::cout << "CANCELLED"; break;
@@ -986,34 +954,26 @@ void manageTickets() {
                     }
                     std::cout << std::endl;
                     
-                    // **ENHANCED DEBUG: Show detailed ticket information**
+                    // Show availability for ALL concerts (remove status filter for debugging)
                     auto concertTickets = g_ticketModule->getTicketsByConcert(concert->id);
-                    int available = 0, sold = 0, total = concertTickets.size();
+                    int available = 0;
+                    // std::cout << "DEBUG: Found " << concertTickets.size() << " tickets for concert " << concert->id << std::endl;
                     
-                    std::cout << "📊 Found " << total << " total tickets for concert " << concert->id << std::endl;
-                    
-                    // Show first 3 tickets for debugging
-                    int debugCount = 0;
                     for (const auto& ticket : concertTickets) {
                         if (ticket->status == Model::TicketStatus::AVAILABLE) {
                             available++;
-                        } else if (ticket->status == Model::TicketStatus::SOLD) {
-                            sold++;
                         }
-                        
-                        // Show details of first 3 tickets
-                        if (debugCount < 3) {
-                            std::cout << "   Ticket " << ticket->ticket_id 
-                                      << " | QR: " << ticket->qr_code 
-                                      << " | Status: " << (int)ticket->status 
-                                      << " (0=AVAILABLE, 1=SOLD)" << std::endl;
-                            debugCount++;
+                        // DEBUG: Show first few ticket details
+                        /*
+                        if (available < 3) {
+                            std::cout << "DEBUG: Ticket " << ticket->ticket_id << " QR:" << ticket->qr_code 
+                                      << " Status:" << (int)ticket->status << std::endl;
                         }
+                        */
                     }
                     
-                    std::cout << "📈 Summary - Total: " << total << " | Available: " << available 
-                              << " | Sold: " << sold << std::endl;
-                    std::cout << std::string(60, '-') << std::endl;
+                    std::cout << concert->name << " (ID: " << concert->id 
+                              << ") - Available: " << available << " tickets\n";
                 }
                 break;
             }
@@ -1183,64 +1143,6 @@ void manageTickets() {
                     std::cout << "🎉 SUCCESS! Fresh AVAILABLE tickets created successfully!\n";
                 } else {
                     std::cout << "⚠️ WARNING: Available count is still 0 - there may be a data persistence issue.\n";
-                }
-                break;
-            }
-            case 9: { // 🔍 DIAGNOSTIC: Debug Ticket Data
-                std::cout << "\n🔍 TICKET DATA DIAGNOSTIC\n";
-                std::cout << "========================\n";
-                
-                auto allTickets = g_ticketModule->getAll();
-                std::cout << "Total tickets in system: " << allTickets.size() << std::endl;
-                
-                // Group tickets by concert
-                std::map<int, std::vector<std::shared_ptr<Model::Ticket>>> ticketsByConcert;
-                std::map<int, int> availableCountByConcert;
-                std::map<int, int> soldCountByConcert;
-                
-                for (const auto& ticket : allTickets) {
-                    // Parse concert ID from QR code
-                    std::string qr = ticket->qr_code;
-                    size_t c_pos = qr.find("C");
-                    size_t a_pos = qr.find("A");
-                    
-                    if (c_pos != std::string::npos && a_pos != std::string::npos && c_pos < a_pos) {
-                        try {
-                            int concert_id = std::stoi(qr.substr(c_pos + 1, a_pos - c_pos - 1));
-                            ticketsByConcert[concert_id].push_back(ticket);
-                            
-                            if (ticket->status == Model::TicketStatus::AVAILABLE) {
-                                availableCountByConcert[concert_id]++;
-                            } else if (ticket->status == Model::TicketStatus::SOLD) {
-                                soldCountByConcert[concert_id]++;
-                            }
-                        } catch (...) {
-                            std::cout << "❌ Failed to parse concert ID from QR: " << qr << std::endl;
-                        }
-                    } else {
-                        std::cout << "❌ Invalid QR format: " << qr << std::endl;
-                    }
-                }
-                
-                std::cout << "\nTickets by Concert:\n";
-                std::cout << "==================\n";
-                for (const auto& [concert_id, tickets] : ticketsByConcert) {
-                    auto concert = g_concertModule->getConcertById(concert_id);
-                    std::string concertName = concert ? concert->name : "Unknown Concert";
-                    
-                    std::cout << "Concert " << concert_id << " (" << concertName << "):\n";
-                    std::cout << "  Total: " << tickets.size() << std::endl;
-                    std::cout << "  Available: " << availableCountByConcert[concert_id] << std::endl;
-                    std::cout << "  Sold: " << soldCountByConcert[concert_id] << std::endl;
-                    
-                    // Show first 3 tickets
-                    std::cout << "  Sample tickets:\n";
-                    for (size_t i = 0; i < std::min(tickets.size(), static_cast<size_t>(3)); i++) {
-                        const auto& t = tickets[i];
-                        std::cout << "    ID:" << t->ticket_id << " QR:" << t->qr_code 
-                                  << " Status:" << (int)t->status << std::endl;
-                    }
-                    std::cout << std::endl;
                 }
                 break;
             }
@@ -2563,6 +2465,7 @@ void runManagementPortal() {
         displayManagementMenu();
         
         int choice;
+        std::cout << "Enter your choice (0-10): ";
         if (!(std::cin >> choice)) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -2589,7 +2492,7 @@ void runManagementPortal() {
                 manageFeedbackAndComm();
                 break;
             case 7: // Reports & Analytics
-                generateReports();
+                showAnalyticsDashboard();
                 break;
             case 8: // System Administration
                 systemAdministration();
@@ -2611,11 +2514,204 @@ void runManagementPortal() {
 }
 
 
+void showAnalyticsDashboard() {
+    // Create report file with timestamp
+    std::string timestamp = Model::DateTime::now().iso8601String;
+    std::replace(timestamp.begin(), timestamp.end(), ':', '-'); // Replace : with - for valid filename
+    std::string reportPath = "data/reports/analytics_" + timestamp + ".txt";
+    
+    // Create reports directory if it doesn't exist
+    #ifdef _WIN32
+        system("mkdir data/reports 2> nul");
+    #else
+        system("mkdir -p data/reports");
+    #endif
+    
+    // Open report file
+    std::ofstream reportFile(reportPath);
+    if (!reportFile) {
+        std::cerr << "Failed to create report file: " << reportPath << std::endl;
+        return;
+    }
+    
+    // Helper lambda to write both to console and file
+    auto writeOutput = [&reportFile](const std::string& text) {
+        std::cout << text;
+        reportFile << text;
+    };
+    
+    writeOutput("\n" + std::string(100, '=') + "\n");
+    writeOutput("📊 MUSEIO ANALYTICS DASHBOARD\n");
+    writeOutput("Generated: " + timestamp + "\n");
+    writeOutput(std::string(100, '=') + "\n");
+
+    // Ticket Sales Overview
+    double totalSales = 0.0;
+    int totalTicketsSold = 0;
+    int totalAttendees = 0;
+    double avgEngagementScore = 0.0;
+    int totalReports = 0;
+
+    for (const auto& report : g_reportModule->getAll()) {
+        totalSales += report->sales_volume;
+        totalTicketsSold += report->tickets_sold;
+        totalAttendees += report->total_registrations;
+        avgEngagementScore += report->attendee_engagement_score;
+        totalReports++;
+    }
+
+    if (totalReports > 0) {
+        avgEngagementScore /= totalReports;
+    }
+
+    // Sales Visualization
+    std::cout << "\n📈 TICKET SALES & REVENUE" << std::endl;
+    std::cout << std::string(50, '-') << std::endl;
+    std::cout << "Total Revenue: $" << std::fixed << std::setprecision(2) << totalSales << std::endl;
+    std::cout << "Tickets Sold: " << totalTicketsSold << std::endl;
+    
+    // Progress bar for ticket sales (assuming 1000 as max capacity)
+    int barWidth = 40;
+
+    // Calculate total venue capacity for more accurate sales metrics
+    int totalCapacity = 0;
+    auto venues = g_venueModule->getAllVenues();
+    for (const auto& venue : venues) {
+        totalCapacity += venue->capacity;
+    }
+    
+    // Use total capacity as max for sales progress (fallback to 1000 if no venues)
+    int maxCapacity = totalCapacity > 0 ? totalCapacity : 1000;
+    int progress = (totalTicketsSold * barWidth) / maxCapacity;
+    int percentage = maxCapacity > 0 ? (totalTicketsSold * 100) / maxCapacity : 0;
+
+    std::cout << "Sales Progress: [";
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < progress) std::cout << "█";
+        else std::cout << " ";
+    }
+    
+    std::cout << "] " << percentage << "% (" << totalTicketsSold << "/" << maxCapacity << " total tickets available for sale)" << std::endl;
+
+    // Attendee Engagement
+    std::cout << "\n👥 ATTENDEE METRICS" << std::endl;
+    std::cout << std::string(50, '-') << std::endl;
+    std::cout << "Total Registrations: " << totalAttendees << std::endl;
+    std::cout << "Average Engagement Score: " << std::fixed << std::setprecision(1) << avgEngagementScore << "/10" << std::endl;
+    
+    // Engagement Visualization
+    std::cout << "Engagement Level: ";
+    int engagementStars = static_cast<int>(avgEngagementScore + 0.5);
+    for (int i = 0; i < 10; ++i) {
+        if (i < engagementStars) std::cout << "⭐";
+        else std::cout << "☆";
+    }
+    std::cout << std::endl;
+
+    // Recent Events
+    std::cout << "\n🎫 RECENT EVENTS" << std::endl;
+    std::cout << std::string(50, '-') << std::endl;
+    
+    auto concerts = g_concertModule->getAll();
+    std::sort(concerts.begin(), concerts.end(),
+        [](const auto& a, const auto& b) {
+            return a->start_date_time.iso8601String > b->start_date_time.iso8601String;
+        });
+
+    int shownConcerts = 0;
+    for (const auto& concert : concerts) {
+        if (shownConcerts >= 5) break; // Show only 5 most recent concerts
+        std::cout << "- " << concert->name << " | Date: " << concert->start_date_time.iso8601String << std::endl;
+        shownConcerts++;
+    }
+
+    // User Feedback Overview
+    std::cout << "\n💭 FEEDBACK OVERVIEW" << std::endl;
+    std::cout << std::string(50, '-') << std::endl;
+    
+    double avgNPS = 0.0;
+    int totalNPS = 0;
+    for (const auto& report : g_reportModule->getAll()) {
+        if (report->nps_score > 0) {
+            avgNPS += report->nps_score;
+            totalNPS++;
+        }
+    }
+    if (totalNPS > 0) {
+        avgNPS /= totalNPS;
+    }
+    
+    std::cout << "Net Promoter Score: " << std::fixed << std::setprecision(1) << avgNPS << std::endl;
+    std::cout << "NPS Category: ";
+    if (avgNPS >= 70) std::cout << "🟢 Excellent";
+    else if (avgNPS >= 50) std::cout << "🟡 Good";
+    else std::cout << "🔴 Needs Improvement";
+    std::cout << std::endl;
+
+    // Append additional verbose information to report file only
+    reportFile << "\n=== DETAILED ANALYTICS INFORMATION ===\n\n";
+    
+    // Venue Details
+    reportFile << "VENUE CAPACITY BREAKDOWN:\n";
+    reportFile << std::string(30, '-') << "\n";
+    for (const auto& venue : venues) {
+        reportFile << "- " << venue->name << "\n";
+        reportFile << "  Capacity: " << venue->capacity << "\n";
+        reportFile << "  Location: " << venue->city << ", " << venue->state << "\n\n";
+    }
+
+    // Concert Details
+    reportFile << "\nCONCERT SCHEDULE & STATUS:\n";
+    reportFile << std::string(30, '-') << "\n";
+    for (const auto& concert : concerts) {
+        reportFile << "- " << concert->name << "\n";
+        reportFile << "  Start: " << concert->start_date_time.iso8601String << "\n";
+        reportFile << "  End: " << concert->end_date_time.iso8601String << "\n";
+        reportFile << "  Status: ";
+        switch (concert->event_status) {
+            case Model::EventStatus::SCHEDULED: reportFile << "SCHEDULED"; break;
+            case Model::EventStatus::CANCELLED: reportFile << "CANCELLED"; break;
+            case Model::EventStatus::POSTPONED: reportFile << "POSTPONED"; break;
+            case Model::EventStatus::COMPLETED: reportFile << "COMPLETED"; break;
+            case Model::EventStatus::SOLDOUT: reportFile << "SOLD OUT"; break;
+            default: reportFile << "UNKNOWN"; break;
+        }
+        reportFile << "\n\n";
+    }
+
+    // Financial Metrics
+    reportFile << "\nFINANCIAL METRICS:\n";
+    reportFile << std::string(30, '-') << "\n";
+    reportFile << "Total Revenue: $" << std::fixed << std::setprecision(2) << totalSales << "\n";
+    reportFile << "Average Revenue per Ticket: $" << (totalTicketsSold > 0 ? totalSales/totalTicketsSold : 0) << "\n";
+    reportFile << "Total Tickets Available: " << maxCapacity << "\n";
+    reportFile << "Tickets Sold: " << totalTicketsSold << "\n";
+    reportFile << "Sales Percentage: " << percentage << "%\n\n";
+
+    // Engagement Metrics
+    reportFile << "\nENGAGEMENT METRICS:\n";
+    reportFile << std::string(30, '-') << "\n";
+    reportFile << "Total Registrations: " << totalAttendees << "\n";
+    reportFile << "Average Engagement Score: " << avgEngagementScore << "/10\n";
+    reportFile << "Net Promoter Score: " << avgNPS << "\n";
+    reportFile << "Total Reports Analyzed: " << totalReports << "\n";
+    
+    reportFile.close();
+    
+    writeOutput("\n" + std::string(100, '=') + "\n");
+    writeOutput("Report exported to: " + reportPath + "\n");
+    writeOutput(std::string(100, '=') + "\n");
+    std::cout << "Press Enter to return to Management Portal...";
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cin.get();
+}
+
 void runUserPortal() {
     while (true) {
         displayUserMenu();
         
         int choice;
+        std::cout << "Enter your choice (0-7): ";
         if (!(std::cin >> choice)) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -2635,8 +2731,14 @@ void runUserPortal() {
             case 4: // Submit Feedback
                 submitFeedback();
                 break;
-            case 5: // Concert Information (Browse Performers & Venues)
+            case 5: // Browse Performers & Venues
                 browsePerformersVenues();
+                break;
+            case 6: // Account & Profile Management
+                manageProfile();
+                break;
+            case 7: // Switch to Management Portal
+                runManagementPortal();
                 break;
             case 0: // Return to Main Menu
                 return;
