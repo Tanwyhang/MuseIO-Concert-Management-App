@@ -306,11 +306,13 @@ namespace TicketManager {
         std::string generateQRCode(int ticket_id) {
             auto ticket = getTicketById(ticket_id);
             if (!ticket) {
+                std::cout << "❌ DEBUG: Ticket " << ticket_id << " not found for QR generation" << std::endl;
                 return "";
             }
             
             // **FIX: Return existing QR code if it exists**
             if (!ticket->qr_code.empty()) {
+                std::cout << "ℹ️ DEBUG: Returning existing QR code for ticket " << ticket_id << ": '" << ticket->qr_code << "'" << std::endl;
                 return ticket->qr_code;
             }
             
@@ -325,6 +327,7 @@ namespace TicketManager {
             ticket->updated_at = Model::DateTime::now();
             saveEntities();
             
+            std::cout << "✅ DEBUG: Generated new QR code for ticket " << ticket_id << ": '" << ticket->qr_code << "'" << std::endl;
             return ticket->qr_code;
         }
 
@@ -334,16 +337,34 @@ namespace TicketManager {
          * @return Ticket ID if valid, -1 if invalid
          */
         int validateQRCode(const std::string& qr_code) {
-            auto it = std::find_if(entities.begin(), entities.end(),
-                [&qr_code](const std::shared_ptr<Model::Ticket>& ticket) {
-                    // **FIX: Accept SOLD, AVAILABLE, and CHECKED_IN tickets for validation**
-                    return ticket->qr_code == qr_code && 
-                           (ticket->status == Model::TicketStatus::SOLD ||
-                            ticket->status == Model::TicketStatus::AVAILABLE ||
-                            ticket->status == Model::TicketStatus::CHECKED_IN);
-                });
+            // Trim whitespace from input QR code
+            std::string trimmed_qr = qr_code;
+            trimmed_qr.erase(0, trimmed_qr.find_first_not_of(" \t\n\r"));
+            trimmed_qr.erase(trimmed_qr.find_last_not_of(" \t\n\r") + 1);
             
-            return (it != entities.end()) ? (*it)->ticket_id : -1;
+            std::cout << "🔍 DEBUG: Validating QR code: '" << trimmed_qr << "'" << std::endl;
+            std::cout << "🔍 DEBUG: Searching through " << entities.size() << " tickets..." << std::endl;
+            
+            for (const auto& ticket : entities) {
+                std::cout << "🔍 DEBUG: Checking ticket " << ticket->ticket_id 
+                         << " with QR: '" << ticket->qr_code << "'" 
+                         << " status: " << static_cast<int>(ticket->status) << std::endl;
+                
+                if (ticket->qr_code == trimmed_qr) {
+                    std::cout << "✅ DEBUG: QR code matches!" << std::endl;
+                    if (ticket->status == Model::TicketStatus::SOLD ||
+                        ticket->status == Model::TicketStatus::AVAILABLE ||
+                        ticket->status == Model::TicketStatus::CHECKED_IN) {
+                        std::cout << "✅ DEBUG: Ticket status is valid for validation" << std::endl;
+                        return ticket->ticket_id;
+                    } else {
+                        std::cout << "❌ DEBUG: Ticket status is invalid (cancelled/expired)" << std::endl;
+                    }
+                }
+            }
+            
+            std::cout << "❌ DEBUG: No matching QR code found" << std::endl;
+            return -1;
         }
 
         /**
@@ -354,20 +375,46 @@ namespace TicketManager {
         bool checkInWithQRCode(const std::string& qr_code) {
             int ticket_id = validateQRCode(qr_code);
             if (ticket_id == -1) {
+                std::cout << "❌ DEBUG: QR code validation failed - QR code not found or invalid format\n";
                 return false;
             }
             
             auto ticket = getTicketById(ticket_id);
-            if (ticket && ticket->status == Model::TicketStatus::SOLD) {
+            if (!ticket) {
+                std::cout << "❌ DEBUG: Ticket with ID " << ticket_id << " not found\n";
+                return false;
+            }
+            
+            std::cout << "🔍 DEBUG: Found ticket " << ticket_id << " with status: ";
+            switch (ticket->status) {
+                case Model::TicketStatus::AVAILABLE: std::cout << "AVAILABLE"; break;
+                case Model::TicketStatus::SOLD: std::cout << "SOLD"; break;
+                case Model::TicketStatus::CHECKED_IN: std::cout << "CHECKED_IN"; break;
+                case Model::TicketStatus::CANCELLED: std::cout << "CANCELLED"; break;
+                case Model::TicketStatus::EXPIRED: std::cout << "EXPIRED"; break;
+            }
+            std::cout << "\n";
+            
+            // Allow check-in for SOLD and AVAILABLE tickets
+            if (ticket->status == Model::TicketStatus::SOLD || 
+                ticket->status == Model::TicketStatus::AVAILABLE) {
                 ticket->status = Model::TicketStatus::CHECKED_IN;
                 ticket->updated_at = Model::DateTime::now();
-                // Note: check_in_time field doesn't exist in Model::Ticket
                 saveEntities();
                 
                 logTicketTransaction(*ticket, "CHECKED_IN");
+                std::cout << "✅ DEBUG: Successfully checked in ticket " << ticket_id << "\n";
                 return true;
             }
             
+            // If already checked in, return true but don't change status
+            if (ticket->status == Model::TicketStatus::CHECKED_IN) {
+                std::cout << "ℹ️ DEBUG: Ticket " << ticket_id << " is already checked in\n";
+                return true; // Already checked in - this is valid
+            }
+            
+            // Reject cancelled or expired tickets
+            std::cout << "❌ DEBUG: Cannot check in - ticket status is not valid for check-in\n";
             return false;
         }
 
