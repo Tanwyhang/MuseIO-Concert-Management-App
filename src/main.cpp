@@ -329,8 +329,6 @@ bool authenticateUser() {
         displayAuthMenu();
         
         int choice;
-        std::cout << "Enter your choice (0-3): ";
-        
         if (!(std::cin >> choice)) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -2465,7 +2463,6 @@ void runManagementPortal() {
         displayManagementMenu();
         
         int choice;
-        std::cout << "Enter your choice (0-10): ";
         if (!(std::cin >> choice)) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -2711,7 +2708,6 @@ void runUserPortal() {
         displayUserMenu();
         
         int choice;
-        std::cout << "Enter your choice (0-7): ";
         if (!(std::cin >> choice)) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');

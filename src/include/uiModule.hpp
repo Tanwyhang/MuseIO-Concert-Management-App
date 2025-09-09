@@ -72,6 +72,8 @@ namespace UIManager {
 │ 3. View My Tickets          │
 │ 4. Submit Feedback          │
 │ 5. Performers & Venues      │
+│ 6. Account & Profile        │
+│ 7. Switch to Management     │
 │ 0. Back to Main Menu        │
 └─────────────────────────────┘
 )";
@@ -276,6 +278,6 @@ Note: Use these credentials to test different user roles and permissions.
         displayUserPortalBanner();
         std::cout << USER_MENU_OPTIONS << std::endl;
         addSmallSpacing();
-        displayChoicePrompt("0-5");
+        displayChoicePrompt("0-7");
     }
 }
