@@ -7,6 +7,13 @@
 #include <sstream>
 #include <iomanip>
 #include <functional>
+#include <fstream>
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 #include "include/models.hpp"
 #include "include/authModule.hpp"
 #include "include/concertModule.hpp"
@@ -1887,13 +1894,11 @@ void monitorPayments() {
         switch (choice) {
             case 1: { // View Payment Statistics
                 auto payments = g_paymentModule->getRecentPayments(1000); // Get recent payments
-                if (payments.empty()) {
-                    std::cout << "No payment records found.\n";
-                    break;
-                }
+                std::cout << "\n--- Payment Statistics ---\n";
+                std::cout << "Total Payments: " << payments.size() << std::endl;
                 
-                double totalRevenue = 0;
                 int completed = 0, pending = 0, failed = 0, refunded = 0;
+                double totalRevenue = 0.0;
                 
                 for (const auto& payment : payments) {
                     switch (payment->status) {
@@ -1913,15 +1918,11 @@ void monitorPayments() {
                     }
                 }
                 
-                std::cout << "\n--- Payment Statistics ---\n";
-                std::cout << "Total Payments: " << payments.size() << std::endl;
                 std::cout << "Completed: " << completed << std::endl;
                 std::cout << "Pending: " << pending << std::endl;
                 std::cout << "Failed: " << failed << std::endl;
                 std::cout << "Refunded: " << refunded << std::endl;
                 std::cout << "Total Revenue: $" << std::fixed << std::setprecision(2) << totalRevenue << std::endl;
-                std::cout << "Success Rate: " << std::fixed << std::setprecision(1) 
-                          << (static_cast<double>(completed) / payments.size() * 100) << "%" << std::endl;
                 break;
             }
             case 2: { // Process Refund
@@ -1956,7 +1957,21 @@ void monitorPayments() {
             }
             case 3: { // View Transaction History
                 auto payments = g_paymentModule->getRecentPayments(1000); // Get recent payments
-                std::cout << "\n--- Transaction History ---\n";
+
+                // Filter to COMPLETED only and sort by payment_id ascending
+                std::vector<std::shared_ptr<Model::Payment>> completed;
+                completed.reserve(payments.size());
+                for (const auto& p : payments) {
+                    if (p && p->status == Model::PaymentStatus::COMPLETED) {
+                        completed.push_back(p);
+                    }
+                }
+                std::sort(completed.begin(), completed.end(),
+                    [](const std::shared_ptr<Model::Payment>& a, const std::shared_ptr<Model::Payment>& b) {
+                        return a->payment_id < b->payment_id;
+                    });
+
+                std::cout << "\n--- Transaction History (COMPLETED only) ---\n";
                 std::cout << std::setw(8) << "ID" << " | " 
                           << std::setw(15) << "Transaction ID" << " | "
                           << std::setw(10) << "Amount" << " | "
@@ -1964,22 +1979,16 @@ void monitorPayments() {
                           << std::setw(15) << "Method" << std::endl;
                 std::cout << std::string(70, '-') << std::endl;
                 
-                for (const auto& payment : payments) {
+                for (const auto& payment : completed) {
                     std::cout << std::setw(8) << payment->payment_id << " | " 
                               << std::setw(15) << payment->transaction_id << " | "
-                              << std::setw(10) << std::fixed << std::setprecision(2) << payment->amount << " | ";
-                    
-                    switch (payment->status) {
-                        case Model::PaymentStatus::COMPLETED: std::cout << std::setw(12) << "COMPLETED"; break;
-                        case Model::PaymentStatus::PENDING: std::cout << std::setw(12) << "PENDING"; break;
-                        case Model::PaymentStatus::FAILED: std::cout << std::setw(12) << "FAILED"; break;
-                        case Model::PaymentStatus::REFUNDED: std::cout << std::setw(12) << "REFUNDED"; break;
-                    }
-                    std::cout << " | " << std::setw(15) << payment->payment_method << std::endl;
+                              << std::setw(10) << std::fixed << std::setprecision(2) << payment->amount << " | "
+                              << std::setw(12) << "COMPLETED"
+                              << " | " << std::setw(15) << payment->payment_method << std::endl;
                 }
                 
-                if (payments.empty()) {
-                    std::cout << "No transactions found.\n";
+                if (completed.empty()) {
+                    std::cout << "No completed transactions found.\n";
                 }
                 break;
             }
@@ -2028,35 +2037,33 @@ void monitorPayments() {
             case 5: { // Revenue Analysis
                 auto payments = g_paymentModule->getRecentPayments(1000); // Get recent payments
                 if (payments.empty()) {
-                    std::cout << "No payment data available for analysis.\n";
+                    std::cout << "No payment data available for revenue report.\n";
                     break;
                 }
                 
-                // Group by payment method
-                std::map<std::string, double> revenueByMethod;
-                std::map<std::string, int> countByMethod;
+                double totalRevenue = 0, completedRevenue = 0, refundedAmount = 0;
+                int totalTransactions = 0, completedTransactions = 0;
                 
                 for (const auto& payment : payments) {
+                    totalTransactions++;
+                    totalRevenue += payment->amount;
+                    
                     if (payment->status == Model::PaymentStatus::COMPLETED) {
-                        revenueByMethod[payment->payment_method] += payment->amount;
-                        countByMethod[payment->payment_method]++;
+                        completedTransactions++;
+                        completedRevenue += payment->amount;
+                    } else if (payment->status == Model::PaymentStatus::REFUNDED) {
+                        refundedAmount += payment->amount;
                     }
                 }
                 
-                std::cout << "\n--- Revenue Analysis by Payment Method ---\n";
-                std::cout << std::setw(15) << "Method" << " | " 
-                          << std::setw(10) << "Count" << " | "
-                          << std::setw(12) << "Revenue" << " | "
-                          << std::setw(12) << "Avg Amount" << std::endl;
-                std::cout << std::string(55, '-') << std::endl;
-                
-                for (const auto& method : revenueByMethod) {
-                    double avgAmount = method.second / countByMethod[method.first];
-                    std::cout << std::setw(15) << method.first << " | " 
-                              << std::setw(10) << countByMethod[method.first] << " | "
-                              << std::setw(12) << std::fixed << std::setprecision(2) << method.second << " | "
-                              << std::setw(12) << std::fixed << std::setprecision(2) << avgAmount << std::endl;
-                }
+                std::cout << "\n--- Revenue Report ---\n";
+                std::cout << "Total Transactions: " << totalTransactions << std::endl;
+                std::cout << "Completed Transactions: " << completedTransactions << std::endl;
+                std::cout << "Gross Revenue: $" << std::fixed << std::setprecision(2) << totalRevenue << std::endl;
+                std::cout << "Net Revenue: $" << std::fixed << std::setprecision(2) << completedRevenue << std::endl;
+                std::cout << "Refunded Amount: $" << std::fixed << std::setprecision(2) << refundedAmount << std::endl;
+                std::cout << "Average Transaction: $" << std::fixed << std::setprecision(2) 
+                          << (completedTransactions > 0 ? completedRevenue / completedTransactions : 0) << std::endl;
                 break;
             }
             case 6: { // Failed Payments
@@ -2680,7 +2687,7 @@ void runManagementPortal() {
             UIManager::displayError("Invalid input. Please enter only integer numbers.");
             continue;
         }
-        
+
         switch (choice) {
             case 1: // Concert Management
                 manageConcerts();
@@ -2727,13 +2734,17 @@ void showAnalyticsDashboard() {
     // Create report file with timestamp
     std::string timestamp = Model::DateTime::now().iso8601String;
     std::replace(timestamp.begin(), timestamp.end(), ':', '-'); // Replace : with - for valid filename
-    std::string reportPath = "data/reports/analytics_" + timestamp + ".txt";
-    
-    // Create reports directory if it doesn't exist
+    const std::string dataDir = "data";
+    const std::string reportsDir = dataDir + "/reports";
+    std::string reportPath = reportsDir + "/analytics_" + timestamp + ".txt";
+
+    // Ensure directories exist (portable)
     #ifdef _WIN32
-        system("mkdir data/reports 2> nul");
+        _mkdir(dataDir.c_str());          // creates if missing; no-op otherwise
+        _mkdir(reportsDir.c_str());
     #else
-        system("mkdir -p data/reports");
+        mkdir(dataDir.c_str(), 0755);
+        mkdir(reportsDir.c_str(), 0755);
     #endif
     
     // Open report file
@@ -3121,8 +3132,10 @@ void purchaseTickets() {
                 
                 // Enhanced validation - check concert exists
                 auto concert = g_concertModule->getConcertById(concertId);
-                if (!concert) {
-                    std::cout << "❌ Concert not found!\n";
+                bool concertExists = (concert != nullptr);
+                
+                if (!concertExists) {
+                    std::cout << "❌ Concert not found!";
                     break;
                 }
                 
@@ -3322,11 +3335,11 @@ void manageMyTickets() {
                 std::cout << "QR Code: " << ticket->qr_code << "\n";
                 std::cout << "Status: ";
                 switch (ticket->status) {
-                    case Model::TicketStatus::AVAILABLE: std::cout << "AVAILABLE"; break;
-                    case Model::TicketStatus::SOLD: std::cout << "PURCHASED"; break;
-                    case Model::TicketStatus::CHECKED_IN: std::cout << "CHECKED IN"; break;
-                    case Model::TicketStatus::CANCELLED: std::cout << "CANCELLED"; break;
-                    case Model::TicketStatus::EXPIRED: std::cout << "EXPIRED"; break;
+                    case Model::TicketStatus::AVAILABLE: std::cout << "🟢 Available"; break;
+                    case Model::TicketStatus::SOLD: std::cout << "🔵 Purchased"; break;
+                    case Model::TicketStatus::CHECKED_IN: std::cout << "✅ Used"; break;
+                    case Model::TicketStatus::CANCELLED: std::cout << "❌ Cancelled"; break;
+                    case Model::TicketStatus::EXPIRED: std::cout << "⏰ Expired"; break;
                 }
                 std::cout << "\n";
                 std::cout << "Created: " << ticket->created_at.iso8601String << "\n";
@@ -3395,6 +3408,7 @@ void submitFeedback() {
     
     int concertId, rating;
     std::string feedbackText;
+
     
     std::cout << "Concert ID (or 0 for general feedback): ";
     std::cin >> concertId;
