@@ -206,6 +206,44 @@ public:
     }
 
     /**
+     * @brief Find concerts by venue ID
+     * @param venueId Venue ID to search for
+     * @return std::vector<std::shared_ptr<Model::Concert>> Concerts at the specified venue
+     */
+    std::vector<std::shared_ptr<Model::Concert>> findConcertsByVenue(int venueId) {
+        return findByPredicate([venueId](const std::shared_ptr<Model::Concert>& concert) {
+            return concert->venue && concert->venue->id == venueId;
+        });
+    }
+
+    /**
+     * @brief Find concerts by performer type (genre-like search)
+     * @param performerType Performer type to search for (case insensitive)
+     * @return std::vector<std::shared_ptr<Model::Concert>> Concerts with performers of the specified type
+     */
+    std::vector<std::shared_ptr<Model::Concert>> findConcertsByPerformerType(const std::string& performerType) {
+        return findByPredicate([&performerType](const std::shared_ptr<Model::Concert>& concert) {
+            // Case insensitive search through all performers
+            std::string searchType = performerType;
+            std::transform(searchType.begin(), searchType.end(), searchType.begin(), 
+                        [](unsigned char c){ return std::tolower(c); });
+            
+            for (const auto& performer : concert->performers) {
+                if (performer) {
+                    std::string perfType = performer->type;
+                    std::transform(perfType.begin(), perfType.end(), perfType.begin(), 
+                                [](unsigned char c){ return std::tolower(c); });
+                    
+                    if (perfType.find(searchType) != std::string::npos) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+    }
+
+    /**
      * @brief Set venue for a concert
      * @param concertId Concert ID
      * @param venue Venue object to assign

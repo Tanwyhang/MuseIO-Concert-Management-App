@@ -3089,13 +3089,14 @@ void browseConcerts() {
     while (true) {
         std::cout << "\n--- Browse Available Concerts ---\n";
         std::cout << "1. View All Upcoming Concerts\n";
-        std::cout << "2. Search by Genre\n";
-        std::cout << "3. Search by Venue\n";
-        std::cout << "4. View Concert Details\n";
+        std::cout << "2. Search by Name\n";
+        std::cout << "3. Search by Genre/Type\n";
+        std::cout << "4. Search by Venue\n";
+        std::cout << "5. View Concert Details\n";
         std::cout << "0. Back to User Portal\n";
         
         std::string choiceStr;
-        std::cout << "Enter choice (0-4): ";
+        std::cout << "Enter choice (0-5): ";
         std::getline(std::cin, choiceStr);
         
         if (!isValidInteger(choiceStr)) {
@@ -3121,22 +3122,86 @@ void browseConcerts() {
                 }
                 break;
             }
-            case 2: { // Search by Genre  
+            case 2: { // Search by Name
+                std::string name;
+                std::cout << "Enter concert name to search (or 0 to cancel): ";
+                std::getline(std::cin, name);
+                if (name == "0") break;
+                
+                auto concerts = g_concertModule->findConcertsByName(name);
+                std::cout << "\n🔍 Search results for '" << name << "':\n";
+                if (concerts.empty()) {
+                    std::cout << "No concerts found matching '" << name << "'.\n";
+                } else {
+                    for (const auto& concert : concerts) {
+                        if (concert->event_status == Model::EventStatus::SCHEDULED || 
+                            concert->event_status == Model::EventStatus::SOLDOUT) {
+                            std::cout << "🎵 " << concert->name << " | ID: " << concert->id << std::endl;
+                            std::cout << "   📅 " << concert->start_date_time.iso8601String << std::endl;
+                            if (concert->venue) {
+                                std::cout << "   📍 " << concert->venue->name << ", " << concert->venue->city << std::endl;
+                            }
+                            std::cout << std::endl;
+                        }
+                    }
+                }
+                break;
+            }
+            case 3: { // Search by Genre/Type
                 std::string genre;
-                std::cout << "Enter genre to search (or 0 to cancel): ";
+                std::cout << "Enter performer type/genre to search (e.g., 'Band', 'Solo Artist', 'DJ', or 0 to cancel): ";
                 std::getline(std::cin, genre);
                 if (genre == "0") break;
                 
-                std::cout << "🔍 Searching for '" << genre << "' concerts...\n";
-                std::cout << "⚠️ Genre search feature requires enhanced concert filtering.\n";
+                auto concerts = g_concertModule->findConcertsByPerformerType(genre);
+                std::cout << "\n🔍 Concerts with '" << genre << "' performers:\n";
+                if (concerts.empty()) {
+                    std::cout << "No concerts found with performers of type '" << genre << "'.\n";
+                } else {
+                    for (const auto& concert : concerts) {
+                        if (concert->event_status == Model::EventStatus::SCHEDULED || 
+                            concert->event_status == Model::EventStatus::SOLDOUT) {
+                            std::cout << "🎵 " << concert->name << " | ID: " << concert->id << std::endl;
+                            std::cout << "   📅 " << concert->start_date_time.iso8601String << std::endl;
+                            if (concert->venue) {
+                                std::cout << "   📍 " << concert->venue->name << ", " << concert->venue->city << std::endl;
+                            }
+                            // Show relevant performers
+                            std::cout << "   🎤 Performers: ";
+                            bool first = true;
+                            for (const auto& performer : concert->performers) {
+                                if (performer) {
+                                    std::string perfType = performer->type;
+                                    std::transform(perfType.begin(), perfType.end(), perfType.begin(), 
+                                                [](unsigned char c){ return std::tolower(c); });
+                                    std::string searchType = genre;
+                                    std::transform(searchType.begin(), searchType.end(), searchType.begin(), 
+                                                [](unsigned char c){ return std::tolower(c); });
+                                    
+                                    if (perfType.find(searchType) != std::string::npos) {
+                                        if (!first) std::cout << ", ";
+                                        std::cout << performer->name << " (" << performer->type << ")";
+                                        first = false;
+                                    }
+                                }
+                            }
+                            std::cout << std::endl << std::endl;
+                        }
+                    }
+                }
                 break;
             }
-            case 3: { // Search by Venue
-                int venueId;
+            case 4: { // Search by Venue
+                std::string venueInput;
                 std::cout << "Enter venue ID to search (or 0 to cancel): ";
-                std::cin >> venueId;
-                if (venueId == 0) break;
-                std::cin.ignore();
+                std::getline(std::cin, venueInput);
+                if (venueInput == "0") break;
+                
+                if (!isValidInteger(venueInput)) {
+                    std::cout << "❌ Invalid venue ID. Please enter a valid integer.\n";
+                    break;
+                }
+                int venueId = std::stoi(venueInput);
                 
                 auto venue = g_venueModule->getVenueById(venueId);
                 if (!venue) {
@@ -3144,25 +3209,33 @@ void browseConcerts() {
                     break;
                 }
                 
-                std::cout << "🔍 Concerts at " << venue->name << ":\n";
-                auto concerts = g_concertModule->getAllConcerts();
-                bool found = false;
-                for (const auto& concert : concerts) {
-                    if (concert->venue && concert->venue->id == venueId) {
-                        std::cout << "🎵 " << concert->name << " | ID: " << concert->id << std::endl;
-                        found = true;
-                    }
-                }
-                if (!found) {
+                auto concerts = g_concertModule->findConcertsByVenue(venueId);
+                std::cout << "\n🔍 Concerts at " << venue->name << ":\n";
+                if (concerts.empty()) {
                     std::cout << "No concerts scheduled at this venue.\n";
+                } else {
+                    for (const auto& concert : concerts) {
+                        if (concert->event_status == Model::EventStatus::SCHEDULED || 
+                            concert->event_status == Model::EventStatus::SOLDOUT) {
+                            std::cout << "🎵 " << concert->name << " | ID: " << concert->id << std::endl;
+                            std::cout << "   📅 " << concert->start_date_time.iso8601String << std::endl;
+                            std::cout << std::endl;
+                        }
+                    }
                 }
                 break;
             }
-            case 4: { // View Concert Details
-                int concertId;
+            case 5: { // View Concert Details
+                std::string concertInput;
                 std::cout << "Enter concert ID for details (or 0 to cancel): ";
-                std::cin >> concertId;
-                if (concertId == 0) break;
+                std::getline(std::cin, concertInput);
+                if (concertInput == "0") break;
+                
+                if (!isValidInteger(concertInput)) {
+                    std::cout << "❌ Invalid concert ID. Please enter a valid integer.\n";
+                    break;
+                }
+                int concertId = std::stoi(concertInput);
                 
                 auto concert = g_concertModule->getConcertById(concertId);
                 if (!concert) {
@@ -3177,6 +3250,16 @@ void browseConcerts() {
                 if (concert->venue) {
                     std::cout << "Venue: " << concert->venue->name << " (" << concert->venue->capacity << " capacity)" << std::endl;
                     std::cout << "Location: " << concert->venue->city << ", " << concert->venue->state << std::endl;
+                }
+                
+                // Show performers
+                if (!concert->performers.empty()) {
+                    std::cout << "Performers: ";
+                    for (size_t i = 0; i < concert->performers.size(); ++i) {
+                        if (i > 0) std::cout << ", ";
+                        std::cout << concert->performers[i]->name << " (" << concert->performers[i]->type << ")";
+                    }
+                    std::cout << std::endl;
                 }
                 
                 // Show ticket availability
