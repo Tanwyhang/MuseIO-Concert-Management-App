@@ -340,4 +340,142 @@ namespace InputValidator {
         
         return ValidationResult(true);
     }
+
+    /**
+     * @brief Validate text containing only alphabetic characters, spaces, and hyphens
+     * Used for performer types and crew roles to prevent special characters
+     * 
+     * @param text The text to validate
+     * @param fieldName Name of the field being validated (for error messages)
+     * @param minLength Minimum length requirement (default: 1)
+     * @param maxLength Maximum length requirement (default: 50)
+     * @return ValidationResult containing validation status and error message
+     */
+    ValidationResult validateAlphabeticText(const std::string& text, 
+                                          const std::string& fieldName = "Field",
+                                          size_t minLength = 1, 
+                                          size_t maxLength = 50) {
+        if (text.empty()) {
+            return ValidationResult(false, fieldName + " cannot be empty");
+        }
+        
+        if (text.length() < minLength) {
+            return ValidationResult(false, fieldName + " must be at least " + 
+                                  std::to_string(minLength) + " characters long");
+        }
+        
+        if (text.length() > maxLength) {
+            return ValidationResult(false, fieldName + " must be no more than " + 
+                                  std::to_string(maxLength) + " characters long");
+        }
+        
+        // Check for invalid characters - only allow letters, spaces, hyphens, and ampersands
+        for (char c : text) {
+            if (!std::isalpha(c) && c != ' ' && c != '-' && c != '&') {
+                return ValidationResult(false, fieldName + " can only contain letters, spaces, hyphens, and ampersands. " +
+                                      "Invalid character found: '" + std::string(1, c) + "'");
+            }
+        }
+        
+        // Check for consecutive spaces or leading/trailing spaces
+        if (text.front() == ' ' || text.back() == ' ') {
+            return ValidationResult(false, fieldName + " cannot start or end with spaces");
+        }
+        
+        // Check for consecutive spaces
+        for (size_t i = 0; i < text.length() - 1; ++i) {
+            if (text[i] == ' ' && text[i + 1] == ' ') {
+                return ValidationResult(false, fieldName + " cannot contain consecutive spaces");
+            }
+        }
+        
+        return ValidationResult(true);
+    }
+
+
+    /**
+     * @brief Validate biography/description text - more permissive but still prevents harmful characters
+     * 
+     * @param bio The biography text to validate
+     * @param fieldName Name of the field being validated (for error messages)
+     * @param minLength Minimum length requirement (default: 0)
+     * @param maxLength Maximum length requirement (default: 500)
+     * @return ValidationResult containing validation status and error message
+     */
+    ValidationResult validateBiography(const std::string& bio, 
+                                     const std::string& fieldName = "Biography",
+                                     size_t minLength = 0, 
+                                     size_t maxLength = 500) {
+        if (bio.length() < minLength) {
+            return ValidationResult(false, fieldName + " must be at least " + 
+                                  std::to_string(minLength) + " characters long");
+        }
+        
+        if (bio.length() > maxLength) {
+            return ValidationResult(false, fieldName + " must be no more than " + 
+                                  std::to_string(maxLength) + " characters long");
+        }
+        
+        // Check for dangerous characters that could cause issues
+        // Allow most printable characters but block potentially dangerous ones
+        for (char c : bio) {
+            // Block control characters, except newline and tab
+            if (c < 32 && c != '\n' && c != '\t') {
+                return ValidationResult(false, fieldName + " contains invalid control characters");
+            }
+            
+            // Block specific dangerous characters
+            if (c == '<' || c == '>' || c == '&' || c == '"' || c == '\'' || 
+                c == ';' || c == '|' || c == '`' || c == '$' || c == '\\') {
+                return ValidationResult(false, fieldName + " cannot contain the character: '" + 
+                                      std::string(1, c) + "'. Please use standard text characters.");
+            }
+        }
+        
+        return ValidationResult(true);
+    }
+
+    /**
+     * @brief Validate contact info (general text) - allows common contact formats
+     * 
+     * @param contact The contact information to validate
+     * @param fieldName Name of the field being validated (for error messages)
+     * @param minLength Minimum length requirement (default: 5)
+     * @param maxLength Maximum length requirement (default: 100)
+     * @return ValidationResult containing validation status and error message
+     */
+    ValidationResult validateContactInfo(const std::string& contact, 
+                                       const std::string& fieldName = "Contact info",
+                                       size_t minLength = 5, 
+                                       size_t maxLength = 100) {
+        if (contact.empty()) {
+            return ValidationResult(false, fieldName + " cannot be empty");
+        }
+        
+        if (contact.length() < minLength) {
+            return ValidationResult(false, fieldName + " must be at least " + 
+                                  std::to_string(minLength) + " characters long");
+        }
+        
+        if (contact.length() > maxLength) {
+            return ValidationResult(false, fieldName + " must be no more than " + 
+                                  std::to_string(maxLength) + " characters long");
+        }
+        
+        // Allow letters, numbers, spaces, common punctuation for contact info
+        for (char c : contact) {
+            if (!std::isalnum(c) && c != ' ' && c != '-' && c != '.' && c != '(' && 
+                c != ')' && c != '+' && c != '@' && c != '_') {
+                return ValidationResult(false, fieldName + " can only contain letters, numbers, spaces, and basic punctuation (- . ( ) + @ _). " +
+                                      "Invalid character found: '" + std::string(1, c) + "'");
+            }
+        }
+        
+        // Check for leading/trailing spaces
+        if (contact.front() == ' ' || contact.back() == ' ') {
+            return ValidationResult(false, fieldName + " cannot start or end with spaces");
+        }
+        
+        return ValidationResult(true);
+    }
 }

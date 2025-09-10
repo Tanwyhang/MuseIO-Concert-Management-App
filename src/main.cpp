@@ -22,6 +22,27 @@
 #include "include/validationModule.hpp"
 #include "include/uiModule.hpp"
 
+// Helper function to validate pure integer input
+bool isValidInteger(const std::string& input) {
+    if (input.empty()) return false;
+    
+    // Check for leading/trailing whitespace
+    if (input.front() == ' ' || input.back() == ' ') return false;
+    
+    // Allow negative numbers (start from index 1 if first char is '-')
+    size_t start = (input[0] == '-') ? 1 : 0;
+    if (start == 1 && input.length() == 1) return false; // Just a '-' is invalid
+    
+    // Check that all remaining characters are digits
+    for (size_t i = start; i < input.length(); ++i) {
+        if (!std::isdigit(input[i])) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
 // DataPaths namespace for centralized file path management
 namespace DataPaths {
     const std::string ATTENDEES_FILE = "data/attendees.dat";
@@ -64,6 +85,88 @@ struct UserSession {
 };
 
 UserSession currentSession;
+
+// Predefined performer types and crew roles
+namespace PredefinedOptions {
+    const std::vector<std::string> PERFORMER_TYPES = {
+        "Solo Artist",
+        "Band",
+        "DJ",
+        "Orchestra",
+        "Choir",
+        "Vocalist",
+        "Instrumentalist",
+        "Producer",
+        "Composer",
+        "Conductor"
+    };
+    
+    const std::vector<std::string> CREW_ROLES = {
+        "Sound Engineer",
+        "Lighting Technician", 
+        "Security",
+        "Stage Manager",
+        "Event Coordinator",
+        "Setup Crew",
+        "Camera Operator",
+        "Merchandise",
+        "Usher",
+        "Technical Support"
+    };
+}
+
+// Helper function to display and get choice from predefined options
+std::string getChoiceFromOptions(const std::vector<std::string>& options, const std::string& prompt) {
+    std::cout << "\n" << prompt << "\n";
+    for (size_t i = 0; i < options.size(); ++i) {
+        std::cout << (i + 1) << ". " << options[i] << "\n";
+    }
+    std::cout << (options.size() + 1) << ". Other (Custom Entry)\n";
+    std::cout << "0. Cancel\n";
+    std::cout << "\nEnter your choice (0-" << (options.size() + 1) << "): ";
+    
+    std::string choiceStr;
+    std::getline(std::cin, choiceStr);
+    
+    if (!isValidInteger(choiceStr)) {
+        std::cout << "❌ Invalid input. Please enter only integer numbers (e.g., '1', '2', '3').\n";
+        return getChoiceFromOptions(options, prompt); // Retry
+    }
+    
+    int choice;
+    try {
+        choice = std::stoi(choiceStr);
+    } catch (const std::exception&) {
+        std::cout << "❌ Invalid input. Please enter only integer numbers.\n";
+        return getChoiceFromOptions(options, prompt); // Retry
+    }
+    
+    if (choice == 0) {
+        return "0"; // Cancel
+    } else if (choice > 0 && choice <= static_cast<int>(options.size())) {
+        return options[choice - 1];
+    } else if (choice == static_cast<int>(options.size() + 1)) {
+        // Custom entry option
+        std::string customInput;
+        std::cout << "Enter custom " << (prompt.find("Performer") != std::string::npos ? "performer type" : "crew role") << ": ";
+        std::getline(std::cin, customInput);
+        
+        // Validate the custom input
+        auto result = InputValidator::validateAlphabeticText(customInput, 
+            (prompt.find("Performer") != std::string::npos ? "Performer type" : "Crew role"), 2, 30);
+        
+        if (result.isValid) {
+            return customInput;
+        } else {
+            std::cout << "❌ " << result.errorMessage << "\n";
+            std::cout << "Please try again or select from the predefined options.\n";
+            return getChoiceFromOptions(options, prompt); // Retry
+        }
+    } else {
+        std::cout << "❌ Invalid choice. Please select a valid option.\n";
+        return getChoiceFromOptions(options, prompt); // Retry
+    }
+}
 
 // Forward declarations for portal handlers
 void runManagementPortal();
@@ -328,15 +431,21 @@ bool authenticateUser() {
     while (true) {
         displayAuthMenu();
         
-        int choice;
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-            UIManager::displayError("Invalid input. Please enter a number.");
+        std::string choiceStr;
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            UIManager::displayError("Invalid input. Please enter only integer numbers (e.g., '1', '2', '3').");
             continue;
         }
         
-        std::cin.ignore(); // Clear the newline character
+        int choice;
+        try {
+            choice = std::stoi(choiceStr);
+        } catch (const std::exception&) {
+            UIManager::displayError("Invalid input. Please enter only integer numbers.");
+            continue;
+        }
         
         switch (choice) {
             case 1: { // Login
@@ -584,14 +693,22 @@ void manageConcerts() {
         std::cout << "6. Concert Statistics\n";
         std::cout << "0. Back to Management Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (0-6): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter only integer numbers (e.g., '1', '2', '3').\n";
             continue;
         }
-        std::cin.ignore();
+        
+        int choice;
+        try {
+            choice = std::stoi(choiceStr);
+        } catch (const std::exception&) {
+            std::cout << "❌ Invalid input. Please enter only integer numbers.\n";
+            continue;
+        }
         
         switch (choice) {
             case 1: { // Create New Concert
@@ -837,14 +954,15 @@ void manageTickets() {
         std::cout << "8. 🆕 RESET TICKET INVENTORY (Create Fresh AVAILABLE Tickets)\n";
         std::cout << "0. Back to Management Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (0-8): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
-        std::cin.ignore();
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // Create Tickets with Enhanced Validation
@@ -1167,14 +1285,15 @@ void manageVenues() {
         std::cout << "6. Venue Capacity Analysis\n";
         std::cout << "0. Back to Management Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (0-6): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
-        std::cin.ignore();
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // Create New Venue
@@ -1417,14 +1536,15 @@ void managePerformersAndCrew() {
         std::cout << "6. Search Crew\n";
         std::cout << "0. Back to Management Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (0-6): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
-        std::cin.ignore();
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // Performer Management
@@ -1443,16 +1563,34 @@ void managePerformersAndCrew() {
                     case 1: { // Create New Performer
                         std::string name, type, contactInfo, bio, imageUrl;
                         
-                        std::cout << "Performer Name (or 0 to cancel): ";
-                        std::getline(std::cin, name);
+                        name = getValidatedInput(
+                            "Performer Name",
+                            [](const std::string& input) {
+                                return InputValidator::validateName(input, "Performer name");
+                            }
+                        );
                         if (name == "0") break;
                         
-                        std::cout << "Type (Solo Artist/Band/DJ/Orchestra/etc.): ";
-                        std::getline(std::cin, type);
-                        std::cout << "Contact Info: ";
-                        std::getline(std::cin, contactInfo);
-                        std::cout << "Biography: ";
-                        std::getline(std::cin, bio);
+                        type = getChoiceFromOptions(PredefinedOptions::PERFORMER_TYPES, "Select Performer Type:");
+                        if (type == "0") break;
+                        
+                        contactInfo = getValidatedInput(
+                            "Contact Info (email/phone)",
+                            [](const std::string& input) {
+                                return InputValidator::validateContactInfo(input, "Contact info", 5, 100);
+                            }
+                        );
+                        if (contactInfo == "0") break;
+                        
+                        bio = getValidatedInput(
+                            "Biography (optional, press Enter to skip)",
+                            [](const std::string& input) {
+                                if (input.empty()) return InputValidator::ValidationResult(true);
+                                return InputValidator::validateBiography(input, "Biography", 0, 500);
+                            }
+                        );
+                        if (bio == "0") break;
+                        
                         std::cout << "Image URL (optional): ";
                         std::getline(std::cin, imageUrl);
                         
@@ -1478,20 +1616,37 @@ void managePerformersAndCrew() {
                         }
                         
                         std::string newName, newType, newContact, newBio;
-                        std::cout << "New name (current: " << performer->name << ", 0 to skip): ";
-                        std::getline(std::cin, newName);
+                        
+                        newName = getValidatedInput(
+                            "New name (current: " + performer->name + ", 0 to skip)",
+                            [](const std::string& input) {
+                                if (input == "0") return InputValidator::ValidationResult(true);
+                                return InputValidator::validateName(input, "Performer name");
+                            }
+                        );
                         if (newName == "0") newName = "";
                         
-                        std::cout << "New type (current: " << performer->type << ", 0 to skip): ";
-                        std::getline(std::cin, newType);
+                        std::cout << "\nCurrent type: " << performer->type << std::endl;
+                        std::cout << "Select new type (or 0 to keep current):\n";
+                        newType = getChoiceFromOptions(PredefinedOptions::PERFORMER_TYPES, "Select New Performer Type:");
                         if (newType == "0") newType = "";
                         
-                        std::cout << "New contact (current: " << performer->contact_info << ", 0 to skip): ";
-                        std::getline(std::cin, newContact);
+                        newContact = getValidatedInput(
+                            "New contact (current: " + performer->contact_info + ", 0 to skip)",
+                            [](const std::string& input) {
+                                if (input == "0") return InputValidator::ValidationResult(true);
+                                return InputValidator::validateContactInfo(input, "Contact info", 5, 100);
+                            }
+                        );
                         if (newContact == "0") newContact = "";
                         
-                        std::cout << "New bio (current: " << performer->bio << ", 0 to skip): ";
-                        std::getline(std::cin, newBio);
+                        newBio = getValidatedInput(
+                            "New bio (current: " + performer->bio + ", 0 to skip)",
+                            [](const std::string& input) {
+                                if (input == "0") return InputValidator::ValidationResult(true);
+                                return InputValidator::validateBiography(input, "Biography", 0, 500);
+                            }
+                        );
                         if (newBio == "0") newBio = "";
                         
                         if (g_performerModule->updatePerformer(performerId, newName, newType, newContact, newBio)) {
@@ -1535,16 +1690,35 @@ void managePerformersAndCrew() {
                     case 1: { // Create New Crew Member
                         std::string name, role, contactInfo, skills;
                         
-                        std::cout << "Crew Member Name: ";
-                        std::getline(std::cin, name);
-                        std::cout << "Role (Sound Engineer/Lighting/Security/etc.): ";
-                        std::getline(std::cin, role);
-                        std::cout << "Contact Info: ";
-                        std::getline(std::cin, contactInfo);
-                        std::cout << "Skills/Certifications: ";
-                        std::getline(std::cin, skills);
+                        name = getValidatedInput(
+                            "Crew Member Name",
+                            [](const std::string& input) {
+                                return InputValidator::validateName(input, "Crew member name");
+                            }
+                        );
+                        if (name == "0") break;
                         
-                        auto crew = g_crewModule->createCrewMember(name, contactInfo, contactInfo);
+                        role = getChoiceFromOptions(PredefinedOptions::CREW_ROLES, "Select Crew Role:");
+                        if (role == "0") break;
+                        
+                        contactInfo = getValidatedInput(
+                            "Contact Info (email/phone)",
+                            [](const std::string& input) {
+                                return InputValidator::validateContactInfo(input, "Contact info", 5, 100);
+                            }
+                        );
+                        if (contactInfo == "0") break;
+                        
+                        skills = getValidatedInput(
+                            "Skills/Certifications (optional)",
+                            [](const std::string& input) {
+                                if (input.empty()) return InputValidator::ValidationResult(true);
+                                return InputValidator::validateBiography(input, "Skills/Certifications", 0, 200);
+                            }
+                        );
+                        if (skills == "0") break;
+                        
+                        auto crew = g_crewModule->createCrewMember(name, contactInfo, contactInfo, role);
                         if (crew) {
                             std::cout << "✅ Crew member created successfully! ID: " << crew->id << std::endl;
                         } else {
@@ -1565,14 +1739,38 @@ void managePerformersAndCrew() {
                         }
                         
                         std::string newName, newRole, newContact, newSkills;
-                        std::cout << "New name (current: " << crew->name << "): ";
-                        std::getline(std::cin, newName);
-                        std::cout << "New role (current: " << g_crewModule->getCrewJob(crew->id) << ", 0 to skip): ";
-                        std::getline(std::cin, newRole);
-                        std::cout << "New contact (current: " << crew->email << ", 0 to skip): ";
-                        std::getline(std::cin, newContact);
-                        std::cout << "New skills (current: [skills not stored in basic crew model], 0 to skip): ";
-                        std::getline(std::cin, newSkills);
+                        
+                        newName = getValidatedInput(
+                            "New name (current: " + crew->name + ", 0 to skip)",
+                            [](const std::string& input) {
+                                if (input == "0") return InputValidator::ValidationResult(true);
+                                return InputValidator::validateName(input, "Crew member name");
+                            }
+                        );
+                        if (newName == "0") newName = "";
+                        
+                        std::cout << "\nCurrent role: " << g_crewModule->getCrewJob(crew->id) << std::endl;
+                        std::cout << "Select new role (or 0 to keep current):\n";
+                        newRole = getChoiceFromOptions(PredefinedOptions::CREW_ROLES, "Select New Crew Role:");
+                        if (newRole == "0") newRole = "";
+                        
+                        newContact = getValidatedInput(
+                            "New contact (current: " + crew->email + ", 0 to skip)",
+                            [](const std::string& input) {
+                                if (input == "0") return InputValidator::ValidationResult(true);
+                                return InputValidator::validateContactInfo(input, "Contact info", 5, 100);
+                            }
+                        );
+                        if (newContact == "0") newContact = "";
+                        
+                        newSkills = getValidatedInput(
+                            "New skills (0 to skip)",
+                            [](const std::string& input) {
+                                if (input == "0" || input.empty()) return InputValidator::ValidationResult(true);
+                                return InputValidator::validateBiography(input, "Skills/Certifications", 0, 200);
+                            }
+                        );
+                        if (newSkills == "0") newSkills = "";
                         
                         if (g_crewModule->updateCrewMember(crewId, newName, newContact, newContact)) {
                             std::cout << "✅ Crew member updated successfully!\n";
@@ -1676,14 +1874,15 @@ void monitorPayments() {
         std::cout << "6. Failed Payments\n";
         std::cout << "0. Back to Management Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (0-6): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
-        std::cin.ignore();
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // View Payment Statistics
@@ -1896,13 +2095,15 @@ void manageFeedbackAndComm() {
         std::cout << "4. Communication Logs\n";
         std::cout << "0. Back to Management Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (0-4): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // View All Feedback
@@ -1977,14 +2178,15 @@ void generateReports() {
         std::cout << "7. Export Reports\n";
         std::cout << "0. Back to Management Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (0-7): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
-        std::cin.ignore();
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // Concert Attendance Report
@@ -2219,14 +2421,15 @@ void systemAdministration() {
         std::cout << "7. System Status\n";
         std::cout << "0. Back to Management Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (0-7): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
-        std::cin.ignore();
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // User Management
@@ -2462,10 +2665,19 @@ void runManagementPortal() {
     while (true) {
         displayManagementMenu();
         
+        std::string choiceStr;
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            UIManager::displayError("Invalid input. Please enter only integer numbers (e.g., '1', '2', '3').");
+            continue;
+        }
+        
         int choice;
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        try {
+            choice = std::stoi(choiceStr);
+        } catch (const std::exception&) {
+            UIManager::displayError("Invalid input. Please enter only integer numbers.");
             continue;
         }
         
@@ -2707,10 +2919,19 @@ void runUserPortal() {
     while (true) {
         displayUserMenu();
         
+        std::string choiceStr;
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            UIManager::displayError("Invalid input. Please enter only integer numbers (e.g., '1', '2', '3').");
+            continue;
+        }
+        
         int choice;
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        try {
+            choice = std::stoi(choiceStr);
+        } catch (const std::exception&) {
+            UIManager::displayError("Invalid input. Please enter only integer numbers.");
             continue;
         }
         
@@ -2754,14 +2975,15 @@ void browseConcerts() {
         std::cout << "4. View Concert Details\n";
         std::cout << "0. Back to User Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (0-4): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
-        std::cin.ignore();
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // View All Upcoming Concerts
@@ -2869,14 +3091,15 @@ void purchaseTickets() {
         std::cout << "3. Check Availability\n";
         std::cout << "0. Back to User Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (0-3): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
-        std::cin.ignore();
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // Quick Purchase
@@ -2999,13 +3222,15 @@ void manageMyTickets() {
         std::cout << "5. Cancel Ticket\n";
         std::cout << "6. Back to User Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (1-6): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // View My Active Tickets
@@ -3224,14 +3449,15 @@ void browsePerformersVenues() {
         std::cout << "6. Venue Details\n";
         std::cout << "7. Back to User Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (1-7): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
-        std::cin.ignore();
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // Browse All Performers
@@ -3414,14 +3640,15 @@ void manageProfile() {
         std::cout << "7. Delete Account\n";
         std::cout << "8. Back to User Portal\n";
         
-        int choice;
+        std::string choiceStr;
         std::cout << "Enter choice (1-8): ";
-        if (!(std::cin >> choice)) {
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, choiceStr);
+        
+        if (!isValidInteger(choiceStr)) {
+            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
             continue;
         }
-        std::cin.ignore();
+        int choice = std::stoi(choiceStr);
         
         switch (choice) {
             case 1: { // View My Profile
@@ -3708,13 +3935,19 @@ int main() {
         while (currentSession.isAuthenticated) {
             displayMainMenu();
             
-            int choice;
+            std::string choiceStr;
+            std::getline(std::cin, choiceStr);
             
-            // Robust input validation
-            if (!(std::cin >> choice)) {
-                std::cin.clear();
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                UIManager::displayError("Invalid input. Please enter a number.");
+            if (!isValidInteger(choiceStr)) {
+                UIManager::displayError("Invalid input. Please enter only integer numbers (e.g., '1', '2', '3').");
+                continue;
+            }
+            
+            int choice;
+            try {
+                choice = std::stoi(choiceStr);
+            } catch (const std::exception&) {
+                UIManager::displayError("Invalid input. Please enter only integer numbers.");
                 continue;
             }
 
