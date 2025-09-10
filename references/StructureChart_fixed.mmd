@@ -1,0 +1,115 @@
+graph TD
+    SYS["MuseIO Concert Management System"]
+
+    %% Core layer
+    SYS --> MODELS["Models"]
+    SYS --> BASE["BaseModule<T,Id>"]
+    SYS --> UI["UIManager"]
+    SYS --> MAIN["Main"]
+
+    %% Modules group
+    subgraph MODULES["Modules"]
+        direction TB
+        AUTH["AuthModule"]
+        CONCERT["ConcertModule"]
+        TICKET["TicketModule"]
+        VENUE["VenueModule"]
+        ATTENDEE["AttendeeModule"]
+        PERFORMER["PerformerModule"]
+        PAYMENT["PaymentModule"]
+        FEEDBACK["FeedbackModule"]
+        REPORT["ReportModule"]
+        COMM["CommunicationModule"]
+        CREW["CrewModule"]
+        VALIDATION["InputValidator"]
+    end
+    SYS --> MODULES
+
+    %% Inheritance from BaseModule
+    BASE -->|template| AUTH
+    BASE -->|template| CONCERT
+    BASE -->|template| TICKET
+    BASE -->|template| VENUE
+    BASE -->|template| ATTENDEE
+    BASE -->|template| PERFORMER
+    BASE -->|template| PAYMENT
+    BASE -->|template| FEEDBACK
+    BASE -->|template| REPORT
+    BASE -->|template| COMM
+    BASE -->|template| CREW
+
+    %% Model usage
+    MODELS --> CONCERT
+    MODELS --> TICKET
+    MODELS --> VENUE
+    MODELS --> ATTENDEE
+    MODELS --> PERFORMER
+    MODELS --> PAYMENT
+    MODELS --> FEEDBACK
+    MODELS --> REPORT
+    MODELS --> COMM
+
+    %% ConcertModule details (level 3 -> 4)
+    CONCERT --> CM_CLASS["ConcertModule (class)"]
+    CM_CLASS --> CM_ctor["ConcertModule(filePath)"]
+    CM_CLASS --> CM_create["createConcert(name,desc,start,end)"]
+    CM_CLASS --> CM_edit["editConcert(concertId,...)"]
+    CM_CLASS --> CM_get["getConcertById(id) / getAllConcerts()"]
+    CM_CLASS --> CM_ticketInfo["setupTicketInfo(...)/setVenueForConcert(...)"]
+    CM_CLASS --> CM_reports["generateConcertReport(concertId)"]
+    CM_CLASS --> Concert_NS["ConcertManager (namespace wrappers)"]
+    Concert_NS --> CM_fn_create["createConcert(...)"]
+    Concert_NS --> CM_fn_edit["editConcert(...)"]
+
+    %% TicketModule details (level 3 -> 4 -> 5)
+    TICKET --> TM_CLASS["TicketModule (class)"]
+    TM_CLASS --> TM_ctor["TicketModule(filePath)"]
+    TM_CLASS --> TM_create["createTicket / createMultipleTickets"]
+    TM_CLASS --> TM_safe["createTicketSafe / createMultipleTicketsSafe"]
+    TM_CLASS --> TM_inventory["createTicketInventory(concertId, qty)"]
+    TM_CLASS --> TM_purchase["purchaseAvailableTicket(attendee,concert)"]
+    TM_CLASS --> TM_qr["generateQRCode / validateQRCode / checkInWithQRCode"]
+    TM_CLASS --> TM_reserve["reserveTickets / confirmReservation / releaseReservation"]
+    TM_CLASS --> TM_stats["getTicketStatistics(concert_id) / generateTicketSalesReport"]
+    TM_CLASS --> Ticket_NS["TicketManager (namespace wrappers)"]
+    Ticket_NS --> TM_fn_createVal["createTicketWithValidation(...)"]
+    Ticket_NS --> TM_fn_getCount["getAvailableCount(...)"]
+
+    %% VenueModule details (level 3 -> 4)
+    VENUE --> VM_CLASS["VenueModule (class)"]
+    VM_CLASS --> VM_ctor["VenueModule(filePath)"]
+    VM_CLASS --> VM_create["createVenue(...)"]
+    VM_CLASS --> VM_getAll["getAllVenues()"]
+    VM_CLASS --> VM_seating["initializeVenueSeatingPlan / addSeat / addSeatWithMapping"]
+    VM_CLASS --> VM_adjacent["findAdjacentSeats(...) / getSeatingPlanVisualization()"]
+    VM_CLASS --> Venue_NS["VenueManager (namespace wrappers)"]
+    Venue_NS --> VM_fn_create["createVenue(...)"]
+    Venue_NS --> VM_fn_visual["getSeatingPlanVisualization(...)"]
+
+    %% ReportModule details (level 3 -> 4 -> 5)
+    REPORT --> RM_CLASS["ReportModule (class)"]
+    RM_CLASS --> RM_ctor["ReportModule(filePath)"]
+    RM_CLASS --> RM_generate["generateConcertReport(concert_id)"]
+    RM_CLASS --> RM_sales["generateSalesAnalyticsReport(start,end,format)"]
+    RM_CLASS --> RM_dashboard["generateDashboardData() -> DashboardData"]
+    RM_CLASS --> RM_structs["SummaryMetrics / ConcertMetrics / DashboardData / FinancialSummary"]
+    RM_CLASS --> RM_export["exportDataForVisualization(...)/formatReportOutput(...)"]
+    RM_CLASS --> RM_schedule["scheduleAutomaticReport(...)/cancelScheduledReport(...)"]
+    RM_CLASS --> Report_NS["ReportManager (namespace wrappers)"]
+
+    %% Cross-module relationships
+    TM_CLASS -->|uses weak_ptr| ATTENDEE
+    TM_CLASS -->|reads| CONCERT
+    CM_CLASS -->|contains| CT_INFO["ConcertTicket (quantity, price)"]
+    CM_CLASS -->|has| VENUE
+    RM_CLASS -->|reads| FEEDBACK
+    RM_CLASS -->|reads| PAYMENT
+    VENUE -->|provides capacity to| TM_CLASS
+
+    %% UI & Main
+    MAIN --> UI
+    MAIN --> MODULES
+    UI -->|calls| Concert_NS
+    UI -->|calls| Ticket_NS
+    UI -->|calls| Venue_NS
+    UI -->|calls| Report_NS
