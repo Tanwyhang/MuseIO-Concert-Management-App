@@ -97,6 +97,18 @@ public:
     }
 
     /**
+     * @brief Find attendee by exact username match
+     * @param username Username to search for
+     * @return std::shared_ptr<Model::Attendee> Matching attendee or nullptr
+     */
+    std::shared_ptr<Model::Attendee> findAttendeeByUsername(const std::string& username) {
+        auto results = findByPredicate([&username](const std::shared_ptr<Model::Attendee>& attendee) {
+            return attendee->username == username;
+        });
+        return results.empty() ? nullptr : results[0];
+    }
+
+    /**
      * @brief Find attendees by partial name match (case insensitive)
      * @param nameQuery Partial name to search for
      * @return std::vector<std::shared_ptr<Model::Attendee>> Vector of matching attendees

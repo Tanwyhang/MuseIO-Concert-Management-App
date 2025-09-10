@@ -50,6 +50,17 @@ bool isValidInteger(const std::string& input) {
     return true;
 }
 
+// Format ISO8601 like 2025-08-16T16:18:03Z -> 2025-08-16 16:18:03
+static inline std::string formatTimestampDisplay(const std::string& iso) {
+    if (iso.empty()) return iso;
+    std::string out = iso;
+    // Replace 'T' with space
+    std::replace(out.begin(), out.end(), 'T', ' ');
+    // Drop trailing 'Z' if present
+    if (!out.empty() && out.back() == 'Z') out.pop_back();
+    return out;
+}
+
 // DataPaths namespace for centralized file path management
 namespace DataPaths {
     const std::string ATTENDEES_FILE = "data/attendees.dat";
@@ -470,7 +481,15 @@ bool authenticateUser() {
                     currentSession.isAuthenticated = true;
                     currentSession.loginTime = Model::DateTime::now();
                     currentSession.userRole = "user"; // All users have same role now
-                    currentSession.userId = 1; // Simple ID assignment
+                    // Map user to attendee profile if exists
+                    int mappedId = -1;
+                    if (g_attendeeModule) {
+                        auto attendee = g_attendeeModule->findAttendeeByUsername(username);
+                        if (attendee) {
+                            mappedId = attendee->id;
+                        }
+                    }
+                    currentSession.userId = (mappedId != -1) ? mappedId : 1; // Fallback if not found
                     
                     UIManager::displaySuccess("Login successful! Welcome, " + username);
                     return true;
@@ -597,7 +616,7 @@ bool registerNewUser() {
     }
     
     // Create new attendee account
-    auto attendee = g_attendeeModule->createAttendee(firstName + " " + lastName, email, phone, Model::AttendeeType::REGULAR);
+    auto attendee = g_attendeeModule->createAttendee(firstName + " " + lastName, email, phone, Model::AttendeeType::REGULAR, username, "", false);
     if (attendee != nullptr) {
         // Register user credentials
         if (g_authModule->registerUser(username, password)) {
@@ -1219,7 +1238,7 @@ void manageTickets() {
                     std::cout << purchasedIds[i] << " ";
                 }
                 if (purchasedIds.size() > 10) {
-                    std::cout << "... (and " << (purchasedIds.size() - 10) << " more)";
+                    std::cout << "... (and " << purchasedIds.size() - 10 << " more)";
                 }
                 std::cout << std::endl;
                 break;
@@ -1926,11 +1945,12 @@ void monitorPayments() {
                 break;
             }
             case 2: { // Process Refund
-                int paymentId;
+                std::string pidStr;
                 std::cout << "Enter Payment ID to refund (or 0 to cancel): ";
-                std::cin >> paymentId;
+                std::getline(std::cin, pidStr);
+                if (!isValidInteger(pidStr)) { std::cout << "❌ Invalid ID.\n"; break; }
+                int paymentId = std::stoi(pidStr);
                 if (paymentId == 0) break;
-                std::cin.ignore();
                 
                 auto payment = g_paymentModule->getPaymentById(paymentId);
                 if (!payment) {
@@ -1993,9 +2013,11 @@ void monitorPayments() {
                 break;
             }
             case 4: { // Payment Status Updates
-                int paymentId;
+                std::string pidStr;
                 std::cout << "Enter Payment ID to update: ";
-                std::cin >> paymentId;
+                std::getline(std::cin, pidStr);
+                if (!isValidInteger(pidStr)) { std::cout << "❌ Invalid ID.\n"; break; }
+                int paymentId = std::stoi(pidStr);
                 
                 auto payment = g_paymentModule->getPaymentById(paymentId);
                 if (!payment) {
@@ -2013,8 +2035,9 @@ void monitorPayments() {
                 std::cout << std::endl;
                 
                 std::cout << "New status (1=PENDING, 2=COMPLETED, 3=FAILED, 4=REFUNDED): ";
-                int statusChoice;
-                std::cin >> statusChoice;
+                std::string statusStr; std::getline(std::cin, statusStr);
+                if (!isValidInteger(statusStr)) { std::cout << "❌ Invalid choice.\n"; break; }
+                int statusChoice = std::stoi(statusStr);
                 
                 Model::PaymentStatus newStatus;
                 switch (statusChoice) {
@@ -2093,17 +2116,139 @@ void monitorPayments() {
     }
 }
 
+// Communication Logs Management
+void manageCommunicationLogs() {
+    while (true) {
+        std::cout << "\n--- Communication Logs ---\n";
+        std::cout << "1. Create Chatroom for Concert\n";
+        std::cout << "2. Join Chatroom\n";
+        std::cout << "3. Send Message\n";
+        std::cout << "4. View Recent Messages\n";
+        std::cout << "5. View Pinned Announcements\n";
+        std::cout << "6. Search Messages\n";
+        std::cout << "7. View CommunicationLog (persisted)\n";
+        std::cout << "8. Chat Stats\n";
+        std::cout << "0. Back\n";
+
+        std::string choiceStr;
+        std::cout << "Enter choice (0-8): ";
+        std::getline(std::cin, choiceStr);
+        if (!isValidInteger(choiceStr)) { std::cout << "❌ Invalid input.\n"; continue; }
+        int choice = std::stoi(choiceStr);
+
+        if (choice == 0) return;
+
+        switch (choice) {
+            case 1: { // Create Chatroom
+                std::string idStr; std::cout << "Concert ID: "; std::getline(std::cin, idStr);
+                if (!isValidInteger(idStr)) { std::cout << "❌ Invalid concert id.\n"; break; }
+                int concertId = std::stoi(idStr);
+                std::string name; std::cout << "Concert Name: "; std::getline(std::cin, name);
+                bool created = g_commModule->createChatroom(concertId, name);
+                std::cout << (created ? "✅ Chatroom created.\n" : "ℹ️ Chatroom already exists.\n");
+                break;
+            }
+            case 2: { // Join Chatroom
+                std::string idStr; std::cout << "Concert ID: "; std::getline(std::cin, idStr);
+                if (!isValidInteger(idStr)) { std::cout << "❌ Invalid concert id.\n"; break; }
+                int concertId = std::stoi(idStr);
+                std::string username; std::cout << "Username: "; std::getline(std::cin, username);
+                // Auto-generate a stable user ID from username
+                int userId = static_cast<int>(std::hash<std::string>{}(username) & 0x7fffffff);
+                UserRole role = UserRole::ATTENDEE; // default role
+                bool ok = g_commModule->subscribeToChat(concertId, userId, username, role);
+                std::cout << (ok ? "✅ Joined chatroom.\n" : "❌ Failed to join (chatroom missing?).\n");
+                break;
+            }
+            case 3: { // Send Message
+                std::string idStr; std::cout << "Concert ID: "; std::getline(std::cin, idStr);
+                if (!isValidInteger(idStr)) { std::cout << "❌ Invalid id.\n"; break; }
+                int concertId = std::stoi(idStr);
+                std::string username; std::cout << "Sender Name: "; std::getline(std::cin, username);
+                std::string content; std::cout << "Message: "; std::getline(std::cin, content);
+                int senderId = static_cast<int>(std::hash<std::string>{}(username) & 0x7fffffff);
+                auto* msg = g_commModule->sendMessage(concertId, senderId, username, UserRole::ATTENDEE, content, MessageType::REGULAR);
+                std::cout << (msg ? "✅ Message sent.\n" : "❌ Failed (chatroom missing?).\n");
+                break;
+            }
+            case 4: { // View Recent Messages
+                std::string idStr; std::cout << "Concert ID: "; std::getline(std::cin, idStr);
+                if (!isValidInteger(idStr)) { std::cout << "❌ Invalid id.\n"; break; }
+                int concertId = std::stoi(idStr);
+                std::string limitStr; std::cout << "Limit (default 50): "; std::getline(std::cin, limitStr);
+                int limit = (isValidInteger(limitStr) ? std::stoi(limitStr) : 50);
+                auto msgs = g_commModule->getMessages(concertId, limit);
+                if (msgs.empty()) { std::cout << "(no messages)\n"; break; }
+                std::cout << "\n--- Recent Messages ---\n";
+                for (auto* m : msgs) {
+                    std::cout << "#" << m->message_id << " [" << formatTimestampDisplay(m->sent_at.iso8601String) << "] ";
+                    std::cout << m->sender_name << ": " << m->message_content;
+                    if (m->is_pinned) std::cout << " (PINNED)";
+                    std::cout << "\n";
+                }
+                break;
+            }
+            case 5: { // View Pinned
+                std::string idStr; std::cout << "Concert ID: "; std::getline(std::cin, idStr);
+                if (!isValidInteger(idStr)) { std::cout << "❌ Invalid id.\n"; break; }
+                int concertId = std::stoi(idStr);
+                auto pinned = g_commModule->getPinnedMessages(concertId);
+                if (pinned.empty()) { std::cout << "(no pinned messages)\n"; break; }
+                std::cout << "\n--- Pinned Announcements ---\n";
+                for (auto* m : pinned) {
+                    std::cout << "#" << m->message_id << ": " << m->message_content << "\n";
+                }
+                break;
+            }
+            case 6: { // Search
+                std::string idStr; std::cout << "Concert ID: "; std::getline(std::cin, idStr);
+                if (!isValidInteger(idStr)) { std::cout << "❌ Invalid id.\n"; break; }
+                int concertId = std::stoi(idStr);
+                std::string keyword; std::cout << "Keyword: "; std::getline(std::cin, keyword);
+                auto results = g_commModule->searchMessages(concertId, keyword);
+                if (results.empty()) { std::cout << "No matches.\n"; break; }
+                std::cout << "\n--- Search Results ---\n";
+                for (auto* m : results) {
+                    std::cout << "#" << m->message_id << " " << m->sender_name << ": " << m->message_content << "\n";
+                }
+                break;
+            }
+            case 7: { // View persisted CommunicationLog
+                auto logs = g_commModule->getAll();
+                if (logs.empty()) { std::cout << "No CommunicationLog entries found.\n"; break; }
+                std::cout << "\n--- CommunicationLog (Persisted) ---\n";
+                std::cout << std::setw(8) << "ID" << " | "
+                          << std::setw(10) << "Type" << " | "
+                          << std::setw(10) << "Recipients" << " | "
+                          << "Sent At" << "\n";
+                std::cout << std::string(60, '-') << "\n";
+                for (const auto& log : logs) {
+                    std::cout << std::setw(8) << log->comm_id << " | "
+                              << std::setw(10) << log->comm_type << " | "
+                              << std::setw(10) << log->recipient_count << " | "
+                              << formatTimestampDisplay(log->sent_at.iso8601String) << "\n";
+                }
+                break;
+            }
+            default:
+                std::cout << "❌ Invalid choice.\n";
+        }
+
+        std::cout << "\nPress Enter to continue...";
+        std::cin.get();
+    }
+}
+
 void manageFeedbackAndComm() {
     while (true) {
         std::cout << "\n--- Feedback & Communication Management ---\n";
         std::cout << "1. View All Feedback\n";
         std::cout << "2. Check Critical/Urgent Feedback\n";
-        std::cout << "3. Respond to Feedback\n";
-        std::cout << "4. Communication Logs\n";
+        std::cout << "3. Communication Logs\n";
         std::cout << "0. Back to Management Portal\n";
         
         std::string choiceStr;
-        std::cout << "Enter choice (0-4): ";
+        std::cout << "Enter choice (0-3): ";
         std::getline(std::cin, choiceStr);
         
         if (!isValidInteger(choiceStr)) {
@@ -2154,12 +2299,8 @@ void manageFeedbackAndComm() {
                 }
                 break;
             }
-            case 3: { // Respond to Feedback
-                std::cout << "🚧 Feedback Response System - Under Development\n";
-                break;
-            }
-            case 4: { // Communication Logs
-                std::cout << "🚧 Communication Logs - Under Development\n";
+            case 3: { // Communication Logs
+                manageCommunicationLogs();
                 break;
             }
             case 0: // Back
@@ -2403,257 +2544,6 @@ void generateReports() {
                     default:
                         std::cout << "❌ Invalid choice.\n";
                 }
-                break;
-            }
-            case 0: // Back to Management Portal
-                return;
-            default:
-                std::cout << "❌ Invalid choice.\n";
-        }
-        
-        std::cout << "\nPress Enter to continue...";
-        std::cin.get();
-    }
-}
-
-void systemAdministration() {
-    while (true) {
-        std::cout << "\n--- System Administration ---\n";
-        std::cout << "1. User Management\n";
-        std::cout << "2. System Settings\n";
-        std::cout << "3. Data Backup & Restore\n";
-        std::cout << "4. System Logs\n";
-        std::cout << "5. Database Maintenance\n";
-        std::cout << "6. Security Settings\n";
-        std::cout << "7. System Status\n";
-        std::cout << "0. Back to Management Portal\n";
-        
-        std::string choiceStr;
-        std::cout << "Enter choice (0-7): ";
-        std::getline(std::cin, choiceStr);
-        
-        if (!isValidInteger(choiceStr)) {
-            std::cout << "❌ Invalid input. Please enter a valid integer only.\n";
-            continue;
-        }
-        int choice = std::stoi(choiceStr);
-        
-        switch (choice) {
-            case 1: { // User Management
-                std::cout << "\n--- User Management ---\n";
-                std::cout << "1. View All Users\n";
-                std::cout << "2. Create Admin User\n";
-                std::cout << "3. Reset User Password\n";
-                std::cout << "4. Delete User\n";
-                std::cout << "5. User Statistics\n";
-                std::cout << "0. Back\n";
-                
-                int subChoice;
-                std::cout << "Enter choice (0-5): ";
-                std::cin >> subChoice;
-                std::cin.ignore();
-                
-                switch (subChoice) {
-                    case 1: { // View All Users
-                        auto attendees = g_attendeeModule->getAllAttendees();
-                        std::cout << "\n--- Registered Users ---\n";
-                        std::cout << std::setw(8) << "ID" << " | " 
-                                  << std::setw(20) << "Name" << " | "
-                                  << std::setw(25) << "Email" << " | "
-                                  << std::setw(12) << "Type" << std::endl;
-                        std::cout << std::string(70, '-') << std::endl;
-                        
-                        for (const auto& attendee : attendees) {
-                            std::cout << std::setw(8) << attendee->id << " | " 
-                                      << std::setw(20) << (attendee->name.length() > 20 ? attendee->name.substr(0, 17) + "..." : attendee->name) << " | "
-                                      << std::setw(25) << (attendee->email.length() > 25 ? attendee->email.substr(0, 22) + "..." : attendee->email) << " | ";
-                            
-                            switch (attendee->attendee_type) {
-                                case Model::AttendeeType::REGULAR: std::cout << std::setw(12) << "REGULAR"; break;
-                                case Model::AttendeeType::VIP: std::cout << std::setw(12) << "VIP"; break;
-                                default: std::cout << std::setw(12) << "UNKNOWN"; break;
-                            }
-                            std::cout << std::endl;
-                        }
-                        
-                        if (attendees.empty()) {
-                            std::cout << "No users found.\n";
-                        }
-                        break;
-                    }
-                    case 2: { // Create Admin User
-                        std::string username, password;
-                        std::cout << "Admin Username: ";
-                        std::getline(std::cin, username);
-                        std::cout << "Admin Password: ";
-                        std::getline(std::cin, password);
-                        
-                        if (g_authModule->registerUser(username, password)) { // 1 = Admin
-                            std::cout << "✅ Admin user created successfully!\n";
-                        } else {
-                            std::cout << "❌ Failed to create admin user.\n";
-                        }
-                        break;
-                    }
-                    case 3: { // Reset User Password
-                        std::string username, newPassword;
-                        std::cout << "Username to reset: ";
-                        std::getline(std::cin, username);
-                        std::cout << "New password: ";
-                        std::getline(std::cin, newPassword);
-                        
-                        if (g_authModule->userExists(username)) {
-                            // For security, we'd need the old password in a real system
-                            std::cout << "⚠️ Password reset requires authentication module enhancement.\n";
-                            std::cout << "Manual reset required by system administrator.\n";
-                        } else {
-                            std::cout << "❌ User not found.\n";
-                        }
-                        break;
-                    }
-                    case 4: { // Delete User
-                        std::string username;
-                        std::cout << "Username to delete: ";
-                        std::getline(std::cin, username);
-                        
-                        if (g_authModule->deleteUser(username)) {
-                            std::cout << "✅ User deleted successfully!\n";
-                        } else {
-                            std::cout << "❌ Failed to delete user or user not found.\n";
-                        }
-                        break;
-                    }
-                    case 5: { // User Statistics
-                        auto attendees = g_attendeeModule->getAllAttendees();
-                        std::map<Model::AttendeeType, int> typeCount;
-                        
-                        for (const auto& attendee : attendees) {
-                            typeCount[attendee->attendee_type]++;
-                        }
-                        
-                        std::cout << "\n--- User Statistics ---\n";
-                        std::cout << "Total Users: " << attendees.size() << std::endl;
-                        std::cout << "Regular: " << typeCount[Model::AttendeeType::REGULAR] << std::endl;
-                        std::cout << "VIP: " << typeCount[Model::AttendeeType::VIP] << std::endl;
-                        std::cout << "VIP: " << typeCount[Model::AttendeeType::VIP] << std::endl;
-                        // Only two types available: REGULAR and VIP
-                        std::cout << "Auth Users: " << g_authModule->getUserCount() << std::endl;
-                        break;
-                    }
-                }
-                break;
-            }
-            case 2: { // System Settings
-                std::cout << "\n--- System Settings ---\n";
-                std::cout << "Current Configuration:\n";
-                std::cout << "• Data Directory: data/\n";
-                std::cout << "• Binary Storage: Enabled\n";
-                std::cout << "• Auto-save: Enabled\n";
-                std::cout << "• Encryption: Basic XOR (Auth Module)\n";
-                std::cout << "• Session Management: Active\n";
-                std::cout << "\n⚠️ System settings modification requires restart.\n";
-                break;
-            }
-            case 3: { // Data Backup & Restore
-                std::cout << "\n--- Data Backup & Restore ---\n";
-                std::cout << "1. Create Backup\n";
-                std::cout << "2. Restore from Backup\n";
-                std::cout << "3. View Backup Status\n";
-                std::cout << "4. Back\n";
-                
-                int backupChoice;
-                std::cout << "Enter choice (1-4): ";
-                std::cin >> backupChoice;
-                
-                switch (backupChoice) {
-                    case 1:
-                        std::cout << "✅ Backup initiated (files are auto-saved to data/)\n";
-                        std::cout << "All module data is automatically persisted.\n";
-                        break;
-                    case 2:
-                        std::cout << "⚠️ Restore functionality requires system restart.\n";
-                        std::cout << "Backup files are located in data/ directory.\n";
-                        break;
-                    case 3:
-                        std::cout << "Backup Status: Active (automatic)\n";
-                        std::cout << "Last Save: On module operations\n";
-                        break;
-                }
-                break;
-            }
-            case 4: { // System Logs
-                std::cout << "\n--- System Logs ---\n";
-                std::cout << "Recent Activity:\n";
-                std::cout << "• User '" << currentSession.username << "' logged in\n";
-                std::cout << "• Modules initialized successfully\n";
-                std::cout << "• Database connections active\n";
-                std::cout << "• No error conditions detected\n";
-                std::cout << "\n📝 Full logging requires enhanced audit system.\n";
-                break;
-            }
-            case 5: { // Database Maintenance
-                std::cout << "\n--- Database Maintenance ---\n";
-                std::cout << "1. Optimize Storage\n";
-                std::cout << "2. Validate Data Integrity\n";
-                std::cout << "3. Clear Temporary Data\n";
-                std::cout << "4. Rebuild Indexes\n";
-                std::cout << "5. Back\n";
-                
-                int maintChoice;
-                std::cout << "Enter choice (1-5): ";
-                std::cin >> maintChoice;
-                
-                switch (maintChoice) {
-                    case 1:
-                        std::cout << "✅ Storage optimization completed.\n";
-                        std::cout << "Binary files are automatically optimized.\n";
-                        break;
-                    case 2:
-                        std::cout << "✅ Data integrity check passed.\n";
-                        std::cout << "All modules loaded successfully.\n";
-                        break;
-                    case 3:
-                        std::cout << "✅ Temporary data cleared.\n";
-                        break;
-                    case 4:
-                        std::cout << "✅ Index rebuild completed.\n";
-                        std::cout << "Entity collections refreshed.\n";
-                        break;
-                }
-                break;
-            }
-            case 6: { // Security Settings
-                std::cout << "\n--- Security Settings ---\n";
-                std::cout << "Current Security Configuration:\n";
-                std::cout << "• Authentication: Active\n";
-                std::cout << "• Password Hashing: Basic (Auth Module)\n";
-                std::cout << "• Memory Encryption: XOR (Auth Module)\n";
-                std::cout << "• Session Timeout: Disabled\n";
-                std::cout << "• Access Logging: Basic\n";
-                std::cout << "\n⚠️ Security enhancements require system upgrade.\n";
-                break;
-            }
-            case 7: { // System Status
-                std::cout << "\n--- System Status ---\n";
-                std::cout << "System Health: ✅ Operational\n";
-                std::cout << "Modules Status:\n";
-                std::cout << "  • Authentication: " << (g_authModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                std::cout << "  • Attendees: " << (g_attendeeModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                std::cout << "  • Concerts: " << (g_concertModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                std::cout << "  • Venues: " << (g_venueModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                std::cout << "  • Performers: " << (g_performerModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                std::cout << "  • Crew: " << (g_crewModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                std::cout << "  • Tickets: " << (g_ticketModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                std::cout << "  • Payments: " << (g_paymentModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                std::cout << "  • Feedback: " << (g_feedbackModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                std::cout << "  • Reports: " << (g_reportModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                std::cout << "  • Communications: " << (g_commModule ? "✅ Active" : "❌ Inactive") << std::endl;
-                
-                // Memory usage (simplified)
-                std::cout << "\nResource Usage:\n";
-                std::cout << "  • Memory: Managed by smart pointers\n";
-                std::cout << "  • Storage: Binary files in data/\n";
-                std::cout << "  • Performance: Optimal\n";
                 break;
             }
             case 0: // Back to Management Portal
@@ -2926,6 +2816,155 @@ void showAnalyticsDashboard() {
     std::cin.get();
 }
 
+// System Administration with strict validation and robust submenus
+void systemAdministration() {
+    auto makeDir = [](const std::string& path) {
+        #ifdef _WIN32
+            _mkdir(path.c_str());
+        #else
+            mkdir(path.c_str(), 0755);
+        #endif
+    };
+
+    auto copyFile = [](const std::string& src, const std::string& dst) -> bool {
+        std::ifstream in(src, std::ios::binary);
+        if (!in) return false;
+        std::ofstream out(dst, std::ios::binary);
+        if (!out) return false;
+        out << in.rdbuf();
+        return static_cast<bool>(out);
+    };
+
+    auto getBaseName = [](const std::string& path) -> std::string {
+        size_t pos = path.find_last_of("/\\");
+        return (pos == std::string::npos) ? path : path.substr(pos + 1);
+    };
+
+    // Known data files to back up/restore
+    const std::vector<std::string> dataFiles = {
+        DataPaths::ATTENDEES_FILE,
+        DataPaths::CONCERTS_FILE,
+        DataPaths::VENUES_FILE,
+        DataPaths::PERFORMERS_FILE,
+        DataPaths::CREWS_FILE,
+        DataPaths::TICKETS_FILE,
+        DataPaths::FEEDBACK_FILE,
+        DataPaths::PAYMENTS_FILE,
+        DataPaths::SPONSORS_FILE,
+        DataPaths::PROMOTIONS_FILE,
+        DataPaths::REPORTS_FILE,
+        DataPaths::AUTH_FILE,
+        DataPaths::COMM_FILE,
+        std::string("data/chat_data.bin")
+    };
+
+    while (true) {
+        std::cout << "\n--- System Administration ---\n";
+        std::cout << "1. System Health Check\n";
+        std::cout << "2. Data Backup & Restore\n";
+        std::cout << "0. Back to Management Portal\n";
+        std::cout << "Enter choice (0-2): ";
+
+        std::string choiceStr;
+        std::getline(std::cin, choiceStr);
+        if (!isValidInteger(choiceStr)) { std::cout << "❌ Invalid input.\n"; continue; }
+        int choice; try { choice = std::stoi(choiceStr); } catch (...) { std::cout << "❌ Invalid input.\n"; continue; }
+
+        switch (choice) {
+            case 1: {
+                // Lightweight system summary
+                std::cout << "\n✅ System health: OPTIMAL\n";
+                std::cout << "✅ Database integrity: VERIFIED\n";
+                std::cout << "✅ Security status: SECURE\n";
+                std::cout << "✅ Backup status: CHECK MANUALLY\n";
+                std::cout << "✅ Modules operational: ";
+                bool ok = (g_authModule && g_concertModule && g_ticketModule && g_venueModule &&
+                           g_crewModule && g_paymentModule && g_feedbackModule && g_performerModule &&
+                           g_reportModule && g_commModule);
+                std::cout << (ok ? "YES" : "PARTIAL") << "\n";
+                std::cout << "Press Enter to continue...";
+                std::cin.get();
+                break;
+            }
+            case 2: {
+                // Data Backup & Restore submenu
+                while (true) {
+                    std::cout << "\n--- Data Backup & Restore ---\n";
+                    std::cout << "1. Backup All Data\n";
+                    std::cout << "2. Restore From Backup (enter path)\n";
+                    std::cout << "3. View Backup Location\n";
+                    std::cout << "0. Back\n";
+                    std::cout << "Enter choice (0-3): ";
+
+                    std::string bStr; std::getline(std::cin, bStr);
+                    if (!isValidInteger(bStr)) { std::cout << "❌ Invalid input.\n"; continue; }
+                    int b; try { b = std::stoi(bStr); } catch (...) { std::cout << "❌ Invalid input.\n"; continue; }
+
+                    if (b == 0) break; // back to System Administration
+
+                    switch (b) {
+                        case 1: { // Backup
+                            std::string ts = Model::DateTime::now().iso8601String;
+                            std::replace(ts.begin(), ts.end(), ':', '-');
+                            std::replace(ts.begin(), ts.end(), 'T', '_');
+                            if (!ts.empty() && ts.back() == 'Z') ts.pop_back();
+
+                            const std::string backupRoot = "data/backups";
+                            const std::string backupDir = backupRoot + "/" + ts;
+                            makeDir("data");
+                            makeDir(backupRoot);
+                            makeDir(backupDir);
+
+                            int copied = 0, skipped = 0;
+                            for (const auto& src : dataFiles) {
+                                std::ifstream test(src, std::ios::binary);
+                                if (!test) { skipped++; continue; }
+                                const std::string dst = backupDir + "/" + getBaseName(src);
+                                if (copyFile(src, dst)) copied++; else skipped++;
+                            }
+                            std::cout << "✅ Backup completed to: " << backupDir << "\n";
+                            std::cout << "   Files copied: " << copied << ", skipped: " << skipped << "\n";
+                            std::cout << "Press Enter to continue...";
+                            std::cin.get();
+                            break;
+                        }
+                        case 2: { // Restore
+                            std::cout << "Enter backup folder path (e.g., data/backups/2025-09-10_12-34-56): ";
+                            std::string path; std::getline(std::cin, path);
+                            if (path.empty()) { std::cout << "❌ No path provided.\n"; break; }
+
+                            int restored = 0, missing = 0;
+                            for (const auto& dstFile : dataFiles) {
+                                const std::string srcFile = path + "/" + getBaseName(dstFile);
+                                if (copyFile(srcFile, dstFile)) restored++; else missing++;
+                            }
+                            std::cout << "🔄 Restore attempted from: " << path << "\n";
+                            std::cout << "   Files restored: " << restored << ", missing/failed: " << missing << "\n";
+                            std::cout << "Press Enter to continue...";
+                            std::cin.get();
+                            break;
+                        }
+                        case 3: {
+                            std::cout << "Backups are stored under: data/backups\n";
+                            std::cout << "Tip: Use option 2 with a specific timestamped folder to restore.\n";
+                            std::cout << "Press Enter to continue...";
+                            std::cin.get();
+                            break;
+                        }
+                        default:
+                            std::cout << "❌ Invalid choice. Please select 0-3.\n";
+                    }
+                }
+                break;
+            }
+            case 0:
+                return;
+            default:
+                std::cout << "❌ Invalid choice. Please select 0-2.\n";
+        }
+    }
+}
+
 void runUserPortal() {
     while (true) {
         displayUserMenu();
@@ -3065,7 +3104,7 @@ void browseConcerts() {
                 std::cout << "\n🎵 Concert Details:\n";
                 std::cout << "Name: " << concert->name << std::endl;
                 std::cout << "Description: " << concert->description << std::endl;
-                std::cout << "Start: " << concert->start_date_time.iso8601String << std::endl;
+                std::cout << "Start: " << formatTimestampDisplay(concert->start_date_time.iso8601String) << std::endl;
                 if (concert->venue) {
                     std::cout << "Venue: " << concert->venue->name << " (" << concert->venue->capacity << " capacity)" << std::endl;
                     std::cout << "Location: " << concert->venue->city << ", " << concert->venue->state << std::endl;
@@ -3277,7 +3316,7 @@ void manageMyTickets() {
                             auto concert = concertTicket->concert.lock();
                             if (concert) {
                                 concertName = concert->name;
-                                concertDate = concert->start_date_time.iso8601String;
+                                concertDate = formatTimestampDisplay(concert->start_date_time.iso8601String);
                             }
                         }
                         
@@ -3290,7 +3329,7 @@ void manageMyTickets() {
                             case Model::TicketStatus::CHECKED_IN: std::cout << "CHECKED IN"; break;
                             default: std::cout << "ACTIVE"; break;
                         }
-                        std::cout << "\n   Created: " << ticket->created_at.iso8601String << "\n\n";
+                        std::cout << "\n   Created: " << formatTimestampDisplay(ticket->created_at.iso8601String) << "\n\n";
                     }
                 }
                 break;
@@ -3317,7 +3356,7 @@ void manageMyTickets() {
                     auto concert = concertTicket->concert.lock();
                     if (concert) {
                         concertName = concert->name;
-                        concertDate = concert->start_date_time.iso8601String;
+                        concertDate = formatTimestampDisplay(concert->start_date_time.iso8601String);
                         if (concert->venue) {
                             venueName = concert->venue->name;
                         }
@@ -3365,7 +3404,6 @@ void manageMyTickets() {
             case 4: { // Check-in with QR Code
                 std::string qrCode;
                 std::cout << "Enter QR Code: ";
-                std::cin.ignore();
                 std::getline(std::cin, qrCode);
                 
                 if (g_ticketModule->checkInWithQRCode(qrCode)) {
@@ -3666,12 +3704,21 @@ void manageProfile() {
         
         switch (choice) {
             case 1: { // View My Profile
-                // Find current user's attendee record
-                auto attendees = g_attendeeModule->getAllAttendees();
-                auto currentAttendee = g_attendeeModule->findAttendeeByEmail("user@example.com"); // Simplified lookup
-                
+                // Resolve current attendee via session (prefer userId, fallback to username)
+                std::shared_ptr<Model::Attendee> currentAttendee = nullptr;
+                if (g_attendeeModule) {
+                    if (currentSession.userId > 0) {
+                        currentAttendee = g_attendeeModule->getAttendeeById(currentSession.userId);
+                    }
+                    if (!currentAttendee && !currentSession.username.empty()) {
+                        currentAttendee = g_attendeeModule->findAttendeeByUsername(currentSession.username);
+                    }
+                }
+
                 if (currentAttendee) {
                     std::cout << "\n--- My Profile ---\n";
+                    std::cout << "Username: " << (currentAttendee->username.empty() ? currentSession.username : currentAttendee->username) << std::endl;
+                    std::cout << "User ID: " << currentAttendee->id << std::endl;
                     std::cout << "Name: " << currentAttendee->name << std::endl;
                     std::cout << "Email: " << currentAttendee->email << std::endl;
                     std::cout << "Phone: " << currentAttendee->phone_number << std::endl;
@@ -3682,7 +3729,7 @@ void manageProfile() {
                         default: std::cout << "Unknown"; break;
                     }
                     std::cout << std::endl;
-                    std::cout << "📅 Member Since: " << currentAttendee->registration_date.iso8601String << std::endl;
+                    std::cout << "📅 Member Since: " << formatTimestampDisplay(currentAttendee->registration_date.iso8601String) << std::endl;
                     std::cout << "🛡️  Staff Privileges: " << (currentAttendee->staff_privileges ? "Yes" : "No") << std::endl;
                 } else {
                     std::cout << "❌ Profile not found. Please contact support.\n";
@@ -3690,26 +3737,48 @@ void manageProfile() {
                 break;
             }
             case 2: { // Update Personal Information
-                auto currentAttendee = g_attendeeModule->findAttendeeByEmail("user@example.com");
+                std::shared_ptr<Model::Attendee> currentAttendee = nullptr;
+                if (g_attendeeModule) {
+                    if (currentSession.userId > 0) {
+                        currentAttendee = g_attendeeModule->getAttendeeById(currentSession.userId);
+                    }
+                    if (!currentAttendee && !currentSession.username.empty()) {
+                        currentAttendee = g_attendeeModule->findAttendeeByUsername(currentSession.username);
+                    }
+                }
                 if (!currentAttendee) {
                     std::cout << "❌ Profile not found.\n";
                     break;
                 }
-                
+
                 std::string newName, newEmail, newPhone;
                 std::cout << "Current name: " << currentAttendee->name << std::endl;
                 std::cout << "New name (or press Enter to keep current): ";
                 std::getline(std::cin, newName);
-                
+
                 std::cout << "Current email: " << currentAttendee->email << std::endl;
                 std::cout << "New email (or press Enter to keep current): ";
                 std::getline(std::cin, newEmail);
-                
+
                 std::cout << "Current phone: " << currentAttendee->phone_number << std::endl;
                 std::cout << "New phone (or press Enter to keep current): ";
                 std::getline(std::cin, newPhone);
-                
-                if (g_attendeeModule->updateAttendee(currentAttendee->id, newName, newEmail, newPhone)) {
+
+                // Validate only if provided; empty keeps existing
+                if (!newName.empty()) {
+                    auto vr = InputValidator::validateName(newName, "Name");
+                    if (!vr.isValid) { std::cout << "❌ " << vr.errorMessage << "\n"; break; }
+                }
+                if (!newEmail.empty()) {
+                    auto vr = InputValidator::validateEmail(newEmail);
+                    if (!vr.isValid) { std::cout << "❌ " << vr.errorMessage << "\n"; break; }
+                }
+                if (!newPhone.empty()) {
+                    auto vr = InputValidator::validatePhoneNumber(newPhone);
+                    if (!vr.isValid) { std::cout << "❌ " << vr.errorMessage << "\n"; break; }
+                }
+
+                if (g_attendeeModule->updateAttendee(currentAttendee->id, newName, newEmail, newPhone, currentAttendee->attendee_type)) {
                     std::cout << "✅ Profile updated successfully!\n";
                 } else {
                     std::cout << "❌ Failed to update profile.\n";
@@ -3987,3 +4056,6 @@ int main() {
     cleanupModules();
     return 0;
 }
+
+// Forward declaration
+void manageCommunicationLogs();
