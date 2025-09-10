@@ -405,12 +405,16 @@ namespace PaymentManager {
          * @param end_date End date (ISO 8601 format)
          * @return Payment report data
          */
+        static std::string numericDate(const std::string& iso) {
+            std::string s; s.reserve(iso.size());
+            for (char c : iso) { if (c=='T') s.push_back(' '); else if (c=='Z') continue; else s.push_back(c);} return s;
+        }
         std::string generatePaymentReport(const std::string& start_date, 
                                         const std::string& end_date) {
             auto payments = getPaymentsByDateRange(start_date, end_date);
             std::ostringstream report;
             
-            report << "Payment Report (" << start_date << " to " << end_date << ")\n";
+            report << "Payment Report (" << numericDate(start_date) << " to " << numericDate(end_date) << ")\n";
             report << "=====================================\n\n";
             
             double totalRevenue = calculateRevenue(start_date, end_date);

@@ -2169,7 +2169,7 @@ void monitorPayments() {
                     std::cout << "Payment ID: " << payment->payment_id 
                               << " | Amount: $" << std::fixed << std::setprecision(2) << payment->amount
                               << " | Method: " << payment->payment_method 
-                              << " | Date: " << payment->payment_date_time.iso8601String << std::endl;
+                              << " | Date: " << formatTimestampDisplay(payment->payment_date_time.iso8601String) << std::endl;
                 }
                 break;
             }
@@ -2721,7 +2721,7 @@ void showAnalyticsDashboard() {
     
     writeOutput("\n" + std::string(100, '=') + "\n");
     writeOutput("📊 MUSEIO ANALYTICS DASHBOARD\n");
-    writeOutput("Generated: " + timestamp + "\n");
+    writeOutput("Generated: " + formatTimestampDisplay(timestamp) + "\n");
     writeOutput(std::string(100, '=') + "\n");
 
     // Ticket Sales Overview
@@ -2800,7 +2800,8 @@ void showAnalyticsDashboard() {
     int shownConcerts = 0;
     for (const auto& concert : concerts) {
         if (shownConcerts >= 5) break; // Show only 5 most recent concerts
-        std::cout << "- " << concert->name << " | Date: " << concert->start_date_time.iso8601String << std::endl;
+        std::cout << "- " << concert->name << " | Date: "
+                  << formatTimestampDisplay(concert->start_date_time.iso8601String) << std::endl;
         shownConcerts++;
     }
 
@@ -2844,8 +2845,8 @@ void showAnalyticsDashboard() {
     reportFile << std::string(30, '-') << "\n";
     for (const auto& concert : concerts) {
         reportFile << "- " << concert->name << "\n";
-        reportFile << "  Start: " << concert->start_date_time.iso8601String << "\n";
-        reportFile << "  End: " << concert->end_date_time.iso8601String << "\n";
+    reportFile << "  Start: " << formatTimestampDisplay(concert->start_date_time.iso8601String) << "\n";
+    reportFile << "  End: " << formatTimestampDisplay(concert->end_date_time.iso8601String) << "\n";
         reportFile << "  Status: ";
         switch (concert->event_status) {
             case Model::EventStatus::SCHEDULED: reportFile << "SCHEDULED"; break;
@@ -3113,7 +3114,7 @@ void browseConcerts() {
                     if (concert->event_status == Model::EventStatus::SCHEDULED || 
                         concert->event_status == Model::EventStatus::SOLDOUT) {
                         std::cout << "🎵 " << concert->name << " | ID: " << concert->id << std::endl;
-                        std::cout << "   📅 " << concert->start_date_time.iso8601String << std::endl;
+                        std::cout << "   📅 " << formatTimestampDisplay(concert->start_date_time.iso8601String) << std::endl;
                         if (concert->venue) {
                             std::cout << "   📍 " << concert->venue->name << ", " << concert->venue->city << std::endl;
                         }
@@ -3375,8 +3376,136 @@ void purchaseTickets() {
                 break;
             }
             case 2: { // Browse and Purchase
-                std::cout << "🚧 Browse and Purchase - Redirecting to concert browser...\n";
-                browseConcerts();
+                // 1) List upcoming concerts
+                auto concerts = g_concertModule->getAllConcerts();
+                std::vector<int> eligibleIds;
+                std::cout << "\n--- Upcoming Concerts (Purchasable) ---\n";
+                for (const auto& concert : concerts) {
+                    if (concert->event_status == Model::EventStatus::SCHEDULED) {
+                        int available = g_ticketModule->getAvailableTicketCount(concert->id);
+                        std::cout << "🎵 " << concert->name
+                                  << " | ID: " << concert->id
+                                  << " | Starts: " << formatTimestampDisplay(concert->start_date_time.iso8601String)
+                                  << " | Available: " << available << "\n";
+                        if (concert->venue) {
+                            std::cout << "   📍 " << concert->venue->name << ", " << concert->venue->city << "\n";
+                        }
+                        eligibleIds.push_back(concert->id);
+                    }
+                }
+
+                if (eligibleIds.empty()) {
+                    std::cout << "❌ No upcoming concerts available for purchase right now.\n";
+                    break;
+                }
+
+                // 2) Choose concert ID
+                std::string cidStr;
+                std::cout << "\nEnter Concert ID to buy (or 0 to cancel): ";
+                std::getline(std::cin, cidStr);
+                if (!isValidInteger(cidStr)) { std::cout << "❌ Invalid input.\n"; break; }
+                int concertId = std::stoi(cidStr);
+                if (concertId == 0) break;
+                auto concert = g_concertModule->getConcertById(concertId);
+                if (!concert || concert->event_status != Model::EventStatus::SCHEDULED) {
+                    std::cout << "❌ Concert not found or not purchasable.\n";
+                    break;
+                }
+
+                // 3) Quantity
+                std::string qtyStr;
+                std::cout << "Quantity (1-10, or 0 to cancel): ";
+                std::getline(std::cin, qtyStr);
+                if (!isValidInteger(qtyStr)) { std::cout << "❌ Invalid quantity.\n"; break; }
+                int quantity = std::stoi(qtyStr);
+                if (quantity <= 0) break;
+                if (quantity > 10) { quantity = 10; }
+
+                // 4) Ticket type (genre/tier)
+                std::string ticketType;
+                std::cout << "Ticket Type (VIP/REGULAR/PREMIUM): ";
+                std::getline(std::cin, ticketType);
+                if (ticketType.empty()) ticketType = "REGULAR";
+                std::transform(ticketType.begin(), ticketType.end(), ticketType.begin(), [](unsigned char c){ return std::toupper(c); });
+
+                // 5) Payment selection
+                std::cout << "\nPayment Method:\n";
+                std::cout << "  1) Online Banking\n";
+                std::cout << "  2) Card\n";
+                std::cout << "  3) E-Wallet\n";
+                std::cout << "  4) Cash\n";
+                std::string pmStr;
+                std::cout << "Choose (1-4): ";
+                std::getline(std::cin, pmStr);
+                if (!isValidInteger(pmStr)) { std::cout << "❌ Invalid payment selection.\n"; break; }
+                int pmChoice = std::stoi(pmStr);
+                std::string paymentMethod;
+                switch (pmChoice) {
+                    case 1: paymentMethod = "Online Banking"; break;
+                    case 2: paymentMethod = "Card"; break;
+                    case 3: paymentMethod = "E-Wallet"; break;
+                    case 4: paymentMethod = "Cash"; break;
+                    default: std::cout << "❌ Invalid payment selection.\n"; break;
+                }
+                if (paymentMethod.empty()) break;
+
+                // 6) Calculate amount (use concert base price if available; fallback to 100)
+                double basePrice = 100.0;
+                if (concert->ticketInfo) {
+                    basePrice = concert->ticketInfo->base_price;
+                }
+                // Simple multipliers by ticket type
+                double multiplier = 1.0;
+                if (ticketType == "VIP") multiplier = 1.5;
+                else if (ticketType == "PREMIUM") multiplier = 1.2;
+                double amount = basePrice * multiplier * static_cast<double>(quantity);
+
+                // 7) Process payment
+                if (!currentSession.isAuthenticated) {
+                    std::cout << "❌ You must be logged in to purchase.\n";
+                    break;
+                }
+                auto attendee = g_attendeeModule->getAttendeeById(currentSession.userId);
+                if (!attendee) {
+                    std::cout << "❌ Attendee profile not found for current session.\n";
+                    break;
+                }
+                std::string txn = g_paymentModule->processPayment(attendee->id, amount, "USD", paymentMethod);
+                if (txn.empty()) {
+                    std::cout << "❌ Payment failed. Please try again.\n";
+                    break;
+                }
+
+                // 8) Purchase tickets (prefer inventory; fallback to direct create)
+                std::vector<int> purchasedTickets;
+                for (int i = 0; i < quantity; ++i) {
+                    int tid = g_ticketModule->purchaseAvailableTicket(attendee->id, concertId, ticketType);
+                    if (tid == -1) {
+                        // Fallback: create sold ticket with validation
+                        tid = g_ticketModule->createTicketSafe(attendee->id, concertId, ticketType, /*concertExists=*/true);
+                    }
+                    if (tid != -1) {
+                        g_ticketModule->setTicketAttendee(tid, attendee);
+                        purchasedTickets.push_back(tid);
+                    } else {
+                        std::cout << "⚠️ Could not allocate ticket " << (i + 1) << "/" << quantity << "\n";
+                        break;
+                    }
+                }
+
+                if (purchasedTickets.empty()) {
+                    std::cout << "❌ No tickets were purchased. Your payment will be reviewed.\n";
+                    break;
+                }
+
+                // 9) Output ticket IDs and QR codes (persisted by TicketModule)
+                std::cout << "\n✅ Purchase completed. Transaction: " << txn << "\n";
+                for (int id : purchasedTickets) {
+                    auto t = g_ticketModule->getTicketById(id);
+                    std::string qr = t ? (!t->qr_code.empty() ? t->qr_code : g_ticketModule->generateQRCode(id))
+                                       : g_ticketModule->generateQRCode(id);
+                    std::cout << "Ticket ID: " << id << " | QR: " << qr << "\n";
+                }
                 break;
             }
             case 3: { // Check Availability
@@ -3438,21 +3567,15 @@ void manageMyTickets() {
         
         switch (choice) {
             case 1: { // View My Active Tickets
-                // First, let's try to get all tickets and filter by user
-                auto allTickets = g_ticketModule->getAll();
-                std::vector<std::shared_ptr<Model::Ticket>> myTickets;
-                
-                // Filter tickets for current user (this is a simplified approach)
-                // In a real system, we'd have proper user-ticket relationships
-                for (const auto& ticket : allTickets) {
-                    if (ticket->status == Model::TicketStatus::SOLD || 
-                        ticket->status == Model::TicketStatus::CHECKED_IN) {
-                        myTickets.push_back(ticket);
-                    }
+                // Resolve current attendee ID
+                int attendeeId = currentSession.userId;
+                if (attendeeId <= 0 && !currentSession.username.empty() && g_attendeeModule) {
+                    auto att = g_attendeeModule->findAttendeeByUsername(currentSession.username);
+                    if (att) attendeeId = att->id;
                 }
-                
+
+                auto myTickets = g_ticketModule->getActiveTicketsByAttendee(attendeeId);
                 std::cout << "\n--- My Active Tickets ---\n";
-                
                 if (myTickets.empty()) {
                     std::cout << "You have no active tickets.\n";
                 } else {
@@ -3490,10 +3613,22 @@ void manageMyTickets() {
                 int ticketId;
                 std::cout << "Enter Ticket ID: ";
                 std::cin >> ticketId;
-                
+                std::cin.ignore();
+
                 auto ticket = g_ticketModule->getTicketById(ticketId);
                 if (!ticket) {
                     std::cout << "❌ Ticket not found.\n";
+                    break;
+                }
+                // Ownership check: ticket must belong to current user
+                int attendeeId = currentSession.userId;
+                if (attendeeId <= 0 && !currentSession.username.empty() && g_attendeeModule) {
+                    auto att = g_attendeeModule->findAttendeeByUsername(currentSession.username);
+                    if (att) attendeeId = att->id;
+                }
+                auto owner = ticket->attendee.lock();
+                if (!owner || owner->id != attendeeId) {
+                    std::cout << "❌ You can only view details of your own tickets.\n";
                     break;
                 }
                 
@@ -3533,8 +3668,8 @@ void manageMyTickets() {
                     case Model::TicketStatus::EXPIRED: std::cout << "⏰ Expired"; break;
                 }
                 std::cout << "\n";
-                std::cout << "Created: " << ticket->created_at.iso8601String << "\n";
-                std::cout << "Updated: " << ticket->updated_at.iso8601String << "\n";
+                std::cout << "Created: " << formatTimestampDisplay(ticket->created_at.iso8601String) << "\n";
+                std::cout << "Updated: " << formatTimestampDisplay(ticket->updated_at.iso8601String) << "\n";
                 break;
             }
             case 3: { // Generate QR Code
@@ -3987,13 +4122,20 @@ void manageProfile() {
                 break;
             }
             case 5: { // My Ticket History
-                auto tickets = g_ticketModule->getAll();
+                // Resolve current attendee ID
+                int attendeeId = currentSession.userId;
+                if (attendeeId <= 0 && !currentSession.username.empty() && g_attendeeModule) {
+                    auto att = g_attendeeModule->findAttendeeByUsername(currentSession.username);
+                    if (att) attendeeId = att->id;
+                }
+
+                auto tickets = g_ticketModule->getTicketsByAttendee(attendeeId);
                 std::cout << "\n--- My Ticket History ---\n";
-                
-                bool hasTickets = false;
+                if (tickets.empty()) {
+                    std::cout << "No ticket history found.\n";
+                    break;
+                }
                 for (const auto& ticket : tickets) {
-                    // In a real system, we'd filter by current user's attendee ID
-                    // For demo purposes, show recent tickets
                     std::cout << "🎫 Ticket ID: " << ticket->ticket_id << std::endl;
                     std::cout << "   Concert: " << "(Concert information requires ConcertTicket relationship)" << std::endl;
                     std::cout << "   Price: " << "(Price information stored in Payment module)" << std::endl;
@@ -4010,11 +4152,6 @@ void manageProfile() {
                         std::cout << "   QR Code: " << ticket->qr_code << std::endl;
                     }
                     std::cout << std::endl;
-                    hasTickets = true;
-                }
-                
-                if (!hasTickets) {
-                    std::cout << "No ticket history found.\n";
                 }
                 break;
             }

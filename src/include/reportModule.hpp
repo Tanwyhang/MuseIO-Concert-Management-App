@@ -24,6 +24,18 @@ namespace ReportManager {
      */
     class ReportModule : public BaseModule<Model::ConcertReport, int> {
     public:
+        // Ensure dates are numeric-only: YYYY-MM-DD HH:MM:SS
+        static std::string numericDate(const std::string& iso) {
+            // Expect ISO: YYYY-MM-DDThh:mm:ssZ -> YYYY-MM-DD hh:mm:ss
+            std::string s;
+            s.reserve(iso.size());
+            for (char c : iso) {
+                if (c == 'T') { s.push_back(' '); continue; }
+                if (c == 'Z') { continue; }
+                s.push_back(c);
+            }
+            return s;
+        }
         /**
          * @brief Constructor
          * @param filePath Path to the reports data file
@@ -102,7 +114,7 @@ namespace ReportManager {
 
             std::ostringstream report;
             report << "Sales Analytics Report\n";
-            report << "Period: " << start_date << " to " << end_date << "\n";
+            report << "Period: " << numericDate(start_date) << " to " << numericDate(end_date) << "\n";
             report << "Format: " << format << "\n\n";
             
             // Simulate sales data
@@ -130,7 +142,7 @@ namespace ReportManager {
 
             std::ostringstream report;
             report << "Payroll Report\n";
-            report << "Period: " << start_date << " to " << end_date << "\n\n";
+            report << "Period: " << numericDate(start_date) << " to " << numericDate(end_date) << "\n\n";
             
             // Simulate payroll data
             report << "Total Payroll: $15,000\n";
@@ -353,7 +365,7 @@ namespace ReportManager {
             
             std::ostringstream pnl;
             pnl << "PROFIT & LOSS STATEMENT\n";
-            pnl << "Period: " << start_date << " to " << end_date << "\n\n";
+            pnl << "Period: " << numericDate(start_date) << " to " << numericDate(end_date) << "\n\n";
             pnl << "REVENUE\n";
             pnl << "Total Revenue: $" << std::fixed << std::setprecision(2) << summary.total_revenue << "\n\n";
             pnl << "EXPENSES\n";
