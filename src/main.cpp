@@ -1290,10 +1290,11 @@ void manageVenues() {
         std::cout << "4. Update Venue Details\n";
         std::cout << "5. Delete Venue\n";
         std::cout << "6. Venue Capacity Analysis\n";
+        std::cout << "7. Visualize Seating Plan\n";
         std::cout << "0. Back to Management Portal\n";
         
         std::string choiceStr;
-        std::cout << "Enter choice (0-6): ";
+        std::cout << "Enter choice (0-7): ";
         std::getline(std::cin, choiceStr);
         
         if (!isValidInteger(choiceStr)) {
@@ -1519,6 +1520,73 @@ void manageVenues() {
                 std::cout << "Average Capacity: " << (totalCapacity / static_cast<int>(venues.size())) << std::endl;
                 std::cout << "Largest Venue: " << largestVenue << " (" << maxCapacity << ")" << std::endl;
                 std::cout << "Smallest Venue: " << smallestVenue << " (" << minCapacity << ")" << std::endl;
+                break;
+            }
+            case 7: { // Visualize Seating Plan
+                auto venues = g_venueModule->getAllVenues();
+                if (venues.empty()) {
+                    UIManager::displayWarning("No venues available. Create a venue first.");
+                    break;
+                }
+                
+                UIManager::addSmallSpacing();
+                UIManager::printSeparator('=');
+                UIManager::printCenteredText("VENUE SEATING PLAN VISUALIZATION");
+                UIManager::printSeparator('=');
+                UIManager::addSmallSpacing();
+                
+                // Display available venues
+                std::cout << "Available Venues:\n";
+                for (size_t i = 0; i < venues.size(); ++i) {
+                    std::cout << (i + 1) << ". " << venues[i]->name 
+                              << " (ID: " << venues[i]->id << ", Capacity: " << venues[i]->capacity << ")\n";
+                }
+                std::cout << "0. Cancel\n\n";
+                
+                std::string venueChoiceStr;
+                std::cout << "Select venue to visualize (0-" << venues.size() << "): ";
+                std::getline(std::cin, venueChoiceStr);
+                
+                if (!isValidInteger(venueChoiceStr)) {
+                    UIManager::displayError("Invalid input. Please enter a number.");
+                    break;
+                }
+                
+                int venueChoice = std::stoi(venueChoiceStr);
+                if (venueChoice == 0) break;
+                if (venueChoice < 1 || venueChoice > static_cast<int>(venues.size())) {
+                    UIManager::displayError("Invalid venue selection.");
+                    break;
+                }
+                
+                auto selectedVenue = venues[venueChoice - 1];
+                
+                // Check if seating plan is initialized
+                if (selectedVenue->rows == 0 || selectedVenue->columns == 0) {
+                    UIManager::displayWarning("Seating plan not initialized for this venue. Initialize it first.");
+                    break;
+                }
+                
+                // Get the visualization
+                std::string visualization = g_venueModule->getSeatingPlanVisualization(selectedVenue->id);
+                
+                // Fancy display
+                UIManager::addSmallSpacing();
+                UIManager::printSeparator('*');
+                std::cout << "🎭 " << selectedVenue->name << " - Seating Plan Visualization 🎭\n";
+                UIManager::printSeparator('*');
+                UIManager::addSmallSpacing();
+                
+                // Display the seating plan with some formatting
+                std::cout << visualization << std::endl;
+                
+                UIManager::addSmallSpacing();
+                UIManager::printSeparator('-');
+                std::cout << "💡 Legend: [A]=Available, [S]=Sold, [C]=Checked In, [X]=Unavailable\n";
+                std::cout << "📍 Venue: " << selectedVenue->name << " | Layout: " 
+                          << selectedVenue->rows << " rows × " << selectedVenue->columns << " columns\n";
+                UIManager::printSeparator('-');
+                
                 break;
             }
             case 0: // Back to Management Portal
@@ -2630,7 +2698,6 @@ void systemAdministration() {
                 std::cout << "• Memory Encryption: XOR (Auth Module)\n";
                 std::cout << "• Session Timeout: Disabled\n";
                 std::cout << "• Access Logging: Basic\n";
-                std::cout << "\n⚠️ Security enhancements require system upgrade.\n";
                 break;
             }
             case 7: { // System Status
