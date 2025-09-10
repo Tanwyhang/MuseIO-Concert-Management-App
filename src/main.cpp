@@ -2169,7 +2169,7 @@ void monitorPayments() {
                     std::cout << "Payment ID: " << payment->payment_id 
                               << " | Amount: $" << std::fixed << std::setprecision(2) << payment->amount
                               << " | Method: " << payment->payment_method 
-                              << " | Date: " << payment->payment_date_time.iso8601String << std::endl;
+                              << " | Date: " << formatTimestampDisplay(payment->payment_date_time.iso8601String) << std::endl;
                 }
                 break;
             }
@@ -2721,7 +2721,7 @@ void showAnalyticsDashboard() {
     
     writeOutput("\n" + std::string(100, '=') + "\n");
     writeOutput("📊 MUSEIO ANALYTICS DASHBOARD\n");
-    writeOutput("Generated: " + timestamp + "\n");
+    writeOutput("Generated: " + formatTimestampDisplay(timestamp) + "\n");
     writeOutput(std::string(100, '=') + "\n");
 
     // Ticket Sales Overview
@@ -2800,7 +2800,8 @@ void showAnalyticsDashboard() {
     int shownConcerts = 0;
     for (const auto& concert : concerts) {
         if (shownConcerts >= 5) break; // Show only 5 most recent concerts
-        std::cout << "- " << concert->name << " | Date: " << concert->start_date_time.iso8601String << std::endl;
+        std::cout << "- " << concert->name << " | Date: "
+                  << formatTimestampDisplay(concert->start_date_time.iso8601String) << std::endl;
         shownConcerts++;
     }
 
@@ -2844,8 +2845,8 @@ void showAnalyticsDashboard() {
     reportFile << std::string(30, '-') << "\n";
     for (const auto& concert : concerts) {
         reportFile << "- " << concert->name << "\n";
-        reportFile << "  Start: " << concert->start_date_time.iso8601String << "\n";
-        reportFile << "  End: " << concert->end_date_time.iso8601String << "\n";
+    reportFile << "  Start: " << formatTimestampDisplay(concert->start_date_time.iso8601String) << "\n";
+    reportFile << "  End: " << formatTimestampDisplay(concert->end_date_time.iso8601String) << "\n";
         reportFile << "  Status: ";
         switch (concert->event_status) {
             case Model::EventStatus::SCHEDULED: reportFile << "SCHEDULED"; break;
@@ -3112,7 +3113,7 @@ void browseConcerts() {
                     if (concert->event_status == Model::EventStatus::SCHEDULED || 
                         concert->event_status == Model::EventStatus::SOLDOUT) {
                         std::cout << "🎵 " << concert->name << " | ID: " << concert->id << std::endl;
-                        std::cout << "   📅 " << concert->start_date_time.iso8601String << std::endl;
+                        std::cout << "   📅 " << formatTimestampDisplay(concert->start_date_time.iso8601String) << std::endl;
                         if (concert->venue) {
                             std::cout << "   📍 " << concert->venue->name << ", " << concert->venue->city << std::endl;
                         }
