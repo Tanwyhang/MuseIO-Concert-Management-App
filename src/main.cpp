@@ -3355,21 +3355,15 @@ void manageMyTickets() {
         
         switch (choice) {
             case 1: { // View My Active Tickets
-                // First, let's try to get all tickets and filter by user
-                auto allTickets = g_ticketModule->getAll();
-                std::vector<std::shared_ptr<Model::Ticket>> myTickets;
-                
-                // Filter tickets for current user (this is a simplified approach)
-                // In a real system, we'd have proper user-ticket relationships
-                for (const auto& ticket : allTickets) {
-                    if (ticket->status == Model::TicketStatus::SOLD || 
-                        ticket->status == Model::TicketStatus::CHECKED_IN) {
-                        myTickets.push_back(ticket);
-                    }
+                // Resolve current attendee ID
+                int attendeeId = currentSession.userId;
+                if (attendeeId <= 0 && !currentSession.username.empty() && g_attendeeModule) {
+                    auto att = g_attendeeModule->findAttendeeByUsername(currentSession.username);
+                    if (att) attendeeId = att->id;
                 }
-                
+
+                auto myTickets = g_ticketModule->getActiveTicketsByAttendee(attendeeId);
                 std::cout << "\n--- My Active Tickets ---\n";
-                
                 if (myTickets.empty()) {
                     std::cout << "You have no active tickets.\n";
                 } else {
@@ -3407,10 +3401,22 @@ void manageMyTickets() {
                 int ticketId;
                 std::cout << "Enter Ticket ID: ";
                 std::cin >> ticketId;
-                
+                std::cin.ignore();
+
                 auto ticket = g_ticketModule->getTicketById(ticketId);
                 if (!ticket) {
                     std::cout << "❌ Ticket not found.\n";
+                    break;
+                }
+                // Ownership check: ticket must belong to current user
+                int attendeeId = currentSession.userId;
+                if (attendeeId <= 0 && !currentSession.username.empty() && g_attendeeModule) {
+                    auto att = g_attendeeModule->findAttendeeByUsername(currentSession.username);
+                    if (att) attendeeId = att->id;
+                }
+                auto owner = ticket->attendee.lock();
+                if (!owner || owner->id != attendeeId) {
+                    std::cout << "❌ You can only view details of your own tickets.\n";
                     break;
                 }
                 
@@ -3450,8 +3456,8 @@ void manageMyTickets() {
                     case Model::TicketStatus::EXPIRED: std::cout << "⏰ Expired"; break;
                 }
                 std::cout << "\n";
-                std::cout << "Created: " << ticket->created_at.iso8601String << "\n";
-                std::cout << "Updated: " << ticket->updated_at.iso8601String << "\n";
+                std::cout << "Created: " << formatTimestampDisplay(ticket->created_at.iso8601String) << "\n";
+                std::cout << "Updated: " << formatTimestampDisplay(ticket->updated_at.iso8601String) << "\n";
                 break;
             }
             case 3: { // Generate QR Code
@@ -3904,13 +3910,20 @@ void manageProfile() {
                 break;
             }
             case 5: { // My Ticket History
-                auto tickets = g_ticketModule->getAll();
+                // Resolve current attendee ID
+                int attendeeId = currentSession.userId;
+                if (attendeeId <= 0 && !currentSession.username.empty() && g_attendeeModule) {
+                    auto att = g_attendeeModule->findAttendeeByUsername(currentSession.username);
+                    if (att) attendeeId = att->id;
+                }
+
+                auto tickets = g_ticketModule->getTicketsByAttendee(attendeeId);
                 std::cout << "\n--- My Ticket History ---\n";
-                
-                bool hasTickets = false;
+                if (tickets.empty()) {
+                    std::cout << "No ticket history found.\n";
+                    break;
+                }
                 for (const auto& ticket : tickets) {
-                    // In a real system, we'd filter by current user's attendee ID
-                    // For demo purposes, show recent tickets
                     std::cout << "🎫 Ticket ID: " << ticket->ticket_id << std::endl;
                     std::cout << "   Concert: " << "(Concert information requires ConcertTicket relationship)" << std::endl;
                     std::cout << "   Price: " << "(Price information stored in Payment module)" << std::endl;
@@ -3927,11 +3940,6 @@ void manageProfile() {
                         std::cout << "   QR Code: " << ticket->qr_code << std::endl;
                     }
                     std::cout << std::endl;
-                    hasTickets = true;
-                }
-                
-                if (!hasTickets) {
-                    std::cout << "No ticket history found.\n";
                 }
                 break;
             }
